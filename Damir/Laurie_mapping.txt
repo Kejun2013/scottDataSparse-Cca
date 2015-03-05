@@ -1,0 +1,55 @@
+
+
+options(max.print=100)
+
+taxa_list=read.table("~/Desktop/ChapkinLab/Damir/taxa_list_for_Scott.csv", stringsAsFactors=FALSE,sep=',',comment.char="#",header=FALSE)
+names(taxa_list)=c("Number","Name","Kingdom")
+#taxa_list
+
+
+taxID_CodeLink_list=read.table("~/Desktop/ChapkinLab/Damir/taxID_CodeLink_map_results.txt", stringsAsFactors=FALSE,sep='\t',comment.char="&", header=TRUE, quote='"')#,skip= 24598, nrow=1)
+#taxID_CodeLink_list
+#16385
+#24599
+dim(taxID_CodeLink_list)
+
+
+
+
+matching=matrix(0,nrow=3000000,6)
+k=1
+for(i in 1:length(taxID_CodeLink_list$Probe))
+{
+	for(j in 1:length(taxa_list$Number))
+	{
+		if(0<length(grep(paste(" ", taxa_list$Number[j], " ",sep=""), taxID_CodeLink_list$nt.Taxa[i])))
+		{
+			matching[k,] = as.matrix(data.frame("damir_index"=i,"GE"=taxID_CodeLink_list$Probe[i], taxa_list[j,],"search_type"="nt.Taxa"))
+			k=k+1
+		}
+
+		if(0<length(grep(paste(" ", taxa_list$Number[j], " ",sep=""), taxID_CodeLink_list$patnt.Taxa[i])))
+		{
+			matching[k,] = as.matrix(data.frame("damir_index"=i,"GE"=taxID_CodeLink_list$Probe[i], taxa_list[j,],"search_type"="patnt.Taxa"))
+			k=k+1
+		}		
+	}
+}
+
+matching=matching[1:k,]
+matching.df=data.frame(matching)
+names(matching.df)=c("Gene ID","GE Number","Taxa ID", "Species", "Kingdom","Column found")
+
+
+write.table(matching.df,"~/Desktop/ChapkinLab/Damir/Laurie_Iddo_Taxa_Matches.csv", sep=",", row.names=FALSE)
+plot(matching[,1])
+
+
+
+# Please search Damir's data set "taxID_CodeLink_map_results" in columns "nt Taxa" and
+# "patnt Taxa"  for the taxa numbers listed in the attached sheet "taxa list for
+# Scott".
+
+
+
+

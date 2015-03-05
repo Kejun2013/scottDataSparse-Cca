@@ -1,0 +1,2030 @@
+
+#this was just messing around
+metabolic_profile_ex=read.table("~/Desktop/ChapkinLab/Iddo/metabolic_profiles/4453348_3_percentID80_cutoff101.txt", 
+stringsAsFactors=TRUE,sep='\t',comment.char="%",quote='"',header=TRUE) #skip=5,nrows=54359,
+names(metabolic_profile_ex)
+summary(metabolic_profile_ex)
+
+
+# this is a new data style..
+# it's a list of data frames. . . weird. counts associated with names and subsets, etc.
+
+sample_filenames=read.table("~/Desktop/ChapkinLab/Iddo/metabolic_profiles/sample_filenames.csv", 
+stringsAsFactors=FALSE,sep=',',comment.char="%",quote='"',header=TRUE) #skip=5,nrows=54359,
+
+metabolic_profile_datalist = NULL
+for(f in 1:length(sample_filenames$filename))
+{
+	metabolic_profile_datalist[[f]] = 
+read.table(paste("~/Desktop/ChapkinLab/Iddo/metabolic_profiles/",sample_filenames$filename[f],sep=""), 
+stringsAsFactors=TRUE,sep='\t',comment.char="%",quote='"',header=TRUE) #skip=5,nrows=54359,
+}
+
+names(metabolic_profile_datalist[[f]])
+metabolic_profile_datalist[[f]][1:10,]
+
+#This aggregates to the highest level of metabolic profiling
+compressed_datalist = as.list(1:length(sample_filenames$filename))
+for(f in 1:length(sample_filenames$filename))
+{
+	dataset = metabolic_profile_datalist[[f]] 
+	print(dim(dataset)[1])
+
+	data_compressed = matrix(NA,length(levels(dataset$Subsystem.Hierarchy.1)),2)
+	data_compressed[,1] = levels(dataset$Subsystem.Hierarchy.1)
+	#data_compressed
+	for(i in 1:dim(data_compressed)[1])
+	{
+		data_compressed[i,2]=sum(dataset$X..Hits[data_compressed[i,1]==dataset$Subsystem.Hierarchy.1])
+	}
+
+	data_compressed=data.frame("Function"= data_compressed[,1],"Count"= as.numeric(data_compressed[,
+2]))
+	compressed_datalist[[f]] = data_compressed
+}
+names(compressed_datalist[[f]])
+compressed_datalist[[f]][1:10,]
+
+
+
+
+#find out what metabolic functions are there
+#pre step to getting all this data into a single data frame
+level1_functions=NULL
+for(f in 1:length(sample_filenames$filename))
+{
+	#list of all level 1 metabolic functions
+	level1_functions=c(level1_functions, levels(compressed_datalist[[f]][,1]))
+}
+level1_functions=unique(level1_functions) 
+level1_functions
+
+
+#putting the highest level counts into a shared matrix
+
+level1_functions_counts=matrix(0,length(level1_functions),12)
+for(f in 1:length(sample_filenames$filename))
+{
+	for(j in 1:dim(data_compressed)[1])
+	{
+		level1_functions_counts[which(level1_functions==compressed_datalist[[f]][j,1]),f]=compressed_datalist[[f]][j,2] 
+	}
+}
+cbind(level1_functions, level1_functions_counts)
+sample_filenames$sample
+
+
+#all the pie charts, now that we've made everything simlar.  
+par(mfrow=c(4,3))
+par(mar=rep(1,4))
+for(f in 1:length(sample_filenames$filename))
+{
+	pie(level1_functions_counts[,f],labels=level1_functions,main=paste(sample_filenames$sample[f]),cex=.75)
+}
+
+
+
+
+
+#Signiture plots
+rank_order=apply(level1_functions_counts,1,sum)
+sort(rank_order,decreasing = TRUE)
+rank_order=sort(rank_order,decreasing = TRUE,index.return=TRUE)$ix
+
+
+total_counts=apply(level1_functions_counts,2,sum)
+total_counts=matrix(rep(total_counts,length(level1_functions)), 
+nrow=length(level1_functions),
+ncol=dim(level1_functions_counts)[2],byrow=TRUE)
+
+level1_functions_percents = level1_functions_counts/total_counts
+apply(level1_functions_percents,2,sum)
+
+
+how_many=1:11
+how_many=12:27
+
+par(mfrow=c(1,1))
+par(mar=c(18,5,3,1))
+#par(mar=c(1,5,3,1))
+plot(1:length(how_many), (level1_functions_percents[rank_order[how_many],1]),type='l',axes=FALSE,ylim=c(0,.05),
+xlab="",ylab="Percent of matched sequences",col='blue',
+main="Metabolic Functional Porfile") 
+for(f in 1:length(sample_filenames$filename))
+{
+	colr='green'
+	llttyy=1
+	if(sample_filenames$Treatment[f]=='FF')
+	{
+		colr='blue'
+		llttyy=2
+	}
+
+	lines(1:length(how_many), (level1_functions_percents)[rank_order[how_many],f],col=colr,lwd=2,lty=llttyy)
+}
+axis(2)
+axis(1,1:length(how_many),level1_functions[rank_order[how_many]],las=2,cex.axis=.75)
+legend('top',c("FF","BF"),fill=c('blue','green'))
+
+par(mar=c(18,5,3,1))
+plot(1:how_many, log(level1_functions_percents[rank_order[1:how_many],1]),type='l',axes=FALSE,#ylim=c(-3.5,-1.5),
+xlab="",ylab="log_e percent of matched sequences",col='blue',
+main="Metabolic Functional Porfile") 
+for(f in 1:length(sample_filenames$filename))
+{
+	colr='green'
+	if(sample_filenames$Treatment[f]=='FF')
+		colr='blue'
+
+	lines(1:how_many, log(level1_functions_percents)[rank_order[1:how_many],f],col=colr,lwd=1)
+}
+axis(2)
+axis(1,1:how_many,level1_functions[rank_order[1:how_many]],las=2,cex.axis=.75)
+legend('top',c("FF","BF"),fill=c('blue','green'))
+
+
+
+
+
+
+# Time to learn PCA -- awesome.
+# svd() is the function we want for starters
+# (we're doing it from scratch so that we really understand it. . . not just callling functions).
+
+
+how_many=10
+XX=(level1_functions_percents[rank_order[1:how_many],])
+# this is the standard format -- cols of XX are samples; rows of XX are measures.
+
+#oh, okay, let's standardize X. . . you gotta do this.
+tmp_mean=apply(XX,1,mean)
+XX=XX-matrix(rep(tmp_mean,12),nrow=how_many,ncol=12,byrow=FALSE)
+
+# NOTE THAT WE AREN'T NORMALIZING. SO WE'RE THINKING
+# MAGNITUDES ARE IMPORTANT. i.e. SMALL % THINGS DON'T MATTER.
+
+dim(XX) 
+### X[10x12]=U[10xL]D[LxR]V[12XR]'
+
+# this gives proportions
+my_1st_SVD = svd(XX,nu=10,nv=12)
+proportions=(my_1st_SVD$d)^2
+
+par(mfrow=c(1,1))
+par(mar=c(5,4,3,1))
+barplot(signif(proportions/sum(proportions),3),
+names.arg=c("pc","2pc","3pc","4pc","5pc","6pc","7pc","8pc","9pc","10pc"),
+main="Principal component (pc) proportion of `variation' explained")
+
+
+### this gives top two, so we can look.
+my_1st_SVD = svd(XX,nu=10,nv=12)
+
+
+par(mfrow=c(2,2))
+tmp=t(my_1st_SVD$u)%*%XX
+x=tmp[1,]
+y=tmp[2,]
+plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+xlab="Principal compoent",
+ylab="Second principal compoent",pch=19)
+points(x[7:12],y[7:12],col='blue',pch=19)
+legend('topleft',c("FF","BF"),fill=c('blue','green'))
+
+x=tmp[1,]
+y=tmp[3,]
+plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+xlab="Principal compoent",
+ylab="Third principal compoent",pch=19)
+points(x[7:12],y[7:12],col='blue',pch=19)
+legend('topleft',c("FF","BF"),fill=c('blue','green'))
+
+x=tmp[2,]
+y=tmp[3,]
+plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+xlab="Second principal compoent",
+ylab="Third principal compoent",pch=19)
+points(x[7:12],y[7:12],col='blue',pch=19)
+legend('topleft',c("FF","BF"),fill=c('blue','green'))
+
+x=tmp[2,]
+y=tmp[4,]
+plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+xlab="Second principal compoent",
+ylab="Fourth principal compoent",pch=19)
+points(x[7:12],y[7:12],col='blue',pch=19)
+legend('topleft',c("FF","BF"),fill=c('blue','green'))
+
+
+# we want to correlate the principal components with the actual data.
+# let's see which ones these components involve 
+
+
+tmp=cor(t(rbind(XX,tmp[1:4,])))
+diag(tmp)=seq(1,-1,-2/13)
+
+par(mfrow=c(1,1))
+par(mar=c(18,18,3,2))
+image(1:14,1:14,tmp,axes=FALSE,xlab="",ylab="",
+main="Original Basis and Principal Component Correlations",col=terrain.colors(14))
+lines(c(10.5,10.5),c(0,15),lwd=3)
+abline(10.5,0,lwd=3)
+colrs=seq(1,-1,-2/13)
+for(i in 1:14)
+{
+	text(i,i,signif(colrs[i],2))
+}
+axis(1,1:14,
+c(level1_functions[rank_order[1:how_many]],"PC","2PC","3PC","4PC"),
+las=2,cex.axis=.75)
+axis(2,1:14,
+c(level1_functions[rank_order[1:how_many]],"PC","2PC","3PC","4PC"),
+las=2,cex.axis=.75)
+
+
+
+
+
+
+# 2nd PC
+# Carbohydrates: DOWN
+# Virulence: UP
+# 
+# 4th PC
+# Cell Wall and Capsule: DOWN
+# RNA Metabolism: UP 
+
+
+reduction=rep(0,length(level1_functions))
+for(i in 1:length(level1_functions))
+{
+	reduction[i]=sum(level1_functions[i]==c("Carbohydrates", "Virulence", "Cell Wall and Capsule", "RNA Metabolism"))
+}
+
+how_many=4
+par(mfrow=c(1,1))
+par(mar=c(8,5,3,1))
+plot(1:how_many, level1_functions_percents[1==reduction,1],type='l',ylim=c(0,.2),axes=FALSE,lty=3,
+xlab="",ylab="Percent of matched sequences",
+main="Metabolic Functional Porfile") 
+for(f in 1:length(sample_filenames$filename))
+{
+	colr='green'
+	ltype=1
+	if(sample_filenames$Treatment[f]=='FF')
+	{
+		colr='blue'
+		ltype=3
+	}
+
+	lines(1:how_many, level1_functions_percents[1==reduction,f], col=colr,lwd=2,lty=ltype)
+}
+axis(2)
+axis(1,1:how_many,level1_functions[1==reduction],las=2,cex.axis=.75)
+legend('top',c("FF","BF"),fill=c('blue','green'))
+
+
+#trying out a three axis plot
+# didn't show anything
+
+library(plotrix)
+small_set=level1_functions_percents[1==reduction,]
+small_set=small_set[2:4,]
+small_set=t(small_set)
+small_set = small_set/apply(small_set,1,sum)
+triax.plot(small_set[1:6,],col.symbol='green')
+triax.points(small_set[7:12,],col.symbol='blue',no.add=FALSE)
+
+
+
+
+
+# We could look at a lower level 
+# like, into carbohydrates, for example.  
+
+
+
+Level_ONE="Carbohydrates"
+
+#find out what metabolic functions are there
+#pre step to getting all this data into a single data frame
+level2_functions=NULL
+for(f in 1:length(sample_filenames$filename))
+{
+	#list of all level 1 metabolic functions
+	level2_functions=c(level2_functions, as.character(metabolic_profile_datalist[[f]][metabolic_profile_datalist[[f]][,1]==Level_ONE,2]))
+}
+level2_functions=unique(level2_functions) 
+level2_functions
+
+
+#putting the highest level counts into a shared matrix
+
+level2_functions_counts=matrix(0,length(level2_functions),12)
+for(f in 1:length(sample_filenames$filename))
+{
+	Level_ONE_set_names = metabolic_profile_datalist[[f]][metabolic_profile_datalist[[f]][,1]==Level_ONE,2]
+	Level_ONE_set_counts = metabolic_profile_datalist[[f]][metabolic_profile_datalist[[f]][,1]==Level_ONE,4]
+
+
+	for(j in 1:length(level2_functions))
+	{
+		level2_functions_counts[j,f] = sum(Level_ONE_set_counts[which(level2_functions[j]==Level_ONE_set_names)])
+	}
+}
+cbind(level2_functions, level2_functions_counts)
+sample_filenames$sample
+
+
+
+
+#all the pie charts, now that we've made everything simlar.  
+par(mfrow=c(4,3))
+par(mar=rep(1,4))
+for(f in 1:length(sample_filenames$filename))
+{
+	pie(level2_functions_counts[,f],labels=level2_functions,main=paste(sample_filenames$sample[f]),cex=.75)
+}
+
+
+
+
+
+#Signiture plots
+rank_order=apply(level2_functions_counts,1,sum)
+sort(rank_order,decreasing = TRUE)
+rank_order=sort(rank_order,decreasing = TRUE,index.return=TRUE)$ix
+
+
+total_counts=apply(level2_functions_counts,2,sum)
+total_counts=matrix(rep(total_counts,length(level2_functions)), 
+nrow=length(level2_functions),
+ncol=dim(level2_functions_counts)[2],byrow=TRUE)
+
+level2_functions_percents = level2_functions_counts/total_counts
+apply(level2_functions_percents,2,sum)
+
+
+how_many=13
+par(mfrow=c(1,1))
+par(mar=c(18,5,3,1))
+plot(1:how_many, (level2_functions_percents[rank_order[1:how_many],1]),type='l',ylim=c(0,.3),axes=FALSE,
+xlab="",ylab="Percent of matched sequences",
+main="Metabolic Functional Porfile") 
+for(f in 1:length(sample_filenames$filename))
+{
+	colr='green'
+	if(sample_filenames$Treatment[f]=='FF')
+		colr='blue'
+
+	lines(1:how_many, (level2_functions_percents)[rank_order[1:how_many],f],col=colr,lwd=2)
+}
+axis(2)
+axis(1,1:how_many,level2_functions[rank_order[1:how_many]],las=2,cex.axis=.75)
+legend('top',c("FF","BF"),fill=c('blue','green'))
+
+
+
+
+
+
+
+
+# Now we want to look for correlations maybe . . . in a rough way?
+# will we be able to see anything useful here? 
+# okay, so I have some host genes here. . . Immunology ones 
+
+
+scotts_Immunology_set
+dim(scotts_Immunology_set)
+
+
+
+rank_order=apply(level1_functions_counts,1,sum)
+sort(rank_order,decreasing = TRUE)
+rank_order=sort(rank_order,decreasing = TRUE,index.return=TRUE)$ix
+
+
+total_counts=apply(level1_functions_counts,2,sum)
+total_counts=matrix(rep(total_counts,length(level1_functions)), 
+nrow=length(level1_functions),
+ncol=dim(level1_functions_counts)[2],byrow=TRUE)
+
+level1_functions_percents = level1_functions_counts/total_counts
+apply(level1_functions_percents,2,sum)
+
+
+
+bacterial_set = level1_functions_percents[rank_order[1:10],]
+
+MULTIVARIATE = rbind(bacterial_set, as.matrix(scotts_Immunology_set))
+MULTIVARIATE = cor(t(MULTIVARIATE))
+diag(MULTIVARIATE)=seq(1,-1,-2/19)
+
+par(mfrow=c(1,1))
+par(mar=c(15,15,3,2))
+image(1:20,1:20, MULTIVARIATE,axes=FALSE,xlab="",ylab="",
+main="Some Microbiome/Host Correlations",col=terrain.colors(14))
+lines(c(10.5,10.5),c(0,20),lwd=3)
+abline(10.5,0,lwd=3)
+colrs=seq(1,-1,-2/19)
+for(i in 1:20)
+{
+	text(i,i,signif(colrs[i],2))
+}
+axis(1,1:20,
+c(level1_functions[rank_order[1:10]],
+paste("Immune and defense gene ", samples_Annotation_OGS_Loessed_Immuno[a_small_interesting_Immunology_subset],sep="")),
+las=2,cex.axis=.75)
+axis(2,1:20,
+c(level1_functions[rank_order[1:10]],paste("Immune and defense gene ", samples_Annotation_OGS_Loessed_Immuno[a_small_interesting_Immunology_subset],sep="")),
+las=2,cex.axis=.75)
+
+
+
+
+It'd be fun to PCA the genes. . . wonder how we would do that .
+
+Ivan wants to see PC separate on different treatment groups.. 
+
+
+
+
+
+let's go ahead and see what we're working with
+
+n=12
+stacked_data = 
+rbind(
+data.frame("id"=sample_filenames$sample[1], metabolic_profile_datalist[[1]]),
+data.frame("id"=sample_filenames$sample[2], metabolic_profile_datalist[[2]]),
+data.frame("id"=sample_filenames$sample[3], metabolic_profile_datalist[[3]]),
+data.frame("id"=sample_filenames$sample[4], metabolic_profile_datalist[[4]]),
+data.frame("id"=sample_filenames$sample[5], metabolic_profile_datalist[[5]]),
+data.frame("id"=sample_filenames$sample[6], metabolic_profile_datalist[[6]]),
+data.frame("id"=sample_filenames$sample[7], metabolic_profile_datalist[[7]]),
+data.frame("id"=sample_filenames$sample[8], metabolic_profile_datalist[[8]]),
+data.frame("id"=sample_filenames$sample[9], metabolic_profile_datalist[[9]]),
+data.frame("id"=sample_filenames$sample[10], metabolic_profile_datalist[[10]]),
+data.frame("id"=sample_filenames$sample[11], metabolic_profile_datalist[[11]]),
+data.frame("id"=sample_filenames$sample[12], metabolic_profile_datalist[[12]]))
+
+names(stacked_data)
+the_samples=unique(stacked_data$id)
+length(unique(stacked_data$Subsystem.Hierarchy.2))
+
+
+# SEED1
+# just some DE tests now:
+# top level 
+SEEDlevel1=unique(stacked_data$Subsystem.Hierarchy.1)
+data_counts = matrix(0,nrow=length(SEEDlevel1), ncol=12)
+for(s in 1:length(SEEDlevel1))
+{
+	
+	for(i in 1:12)
+	{
+		data_counts[s,i]=sum(stacked_data[stacked_data$Subsystem.Hierarchy.1==SEEDlevel1[s] & stacked_data$id==the_samples[i], 5])
+	}
+}
+data_percents = t(t(data_counts)/apply(data_counts,2,sum))
+apply(data_percents,2,sum)
+
+
+iddo_LEVEL_1_percents = data.frame(data_percents) 
+names(iddo_LEVEL_1_percents) = the_samples
+iddo_LEVEL_1_counts = data.frame(data_counts) 
+names(iddo_LEVEL_1_counts) = the_samples
+write.table(data.frame(SEEDlevel1, iddo_LEVEL_1_percents, iddo_LEVEL_1_counts) , "~/Desktop/ChapkinLab/Iddo/iddo_SEED_LEVEL_1.txt", sep='\t', row.names=FALSE)
+
+if(1==0) # looking at read counts .. not all stuff mapped
+{
+	tmp=apply(data_counts,2,sum)
+	par(mfrow=c(1,1))
+	plot(1:6, tmp[1:6], main="Sequencing depth", col='green', ylab="total mapped reads", xlab="", xlim=c(1,12), axes=FALSE)
+	axis(2)
+	axis(1, 1:12, the_samples)
+	points(7:12, tmp[7:12], main="FF", col='blue', xlab="total mapped reads")
+	legend('topleft', c("BF", "FF"), fill=c("green","blue"),cex=.65) 
+
+	par(mfrow=c(1,2))
+	hist(c(data_counts[,1:6]), breaks=seq(0,9000,250), main="BF SEED 1 categories", xlab="read counts")
+	hist(c(data_counts[,7:12]), breaks=seq(0,9000,250), main="FF SEED 1 categories", xlab="read counts")
+
+par(mfrow=c(1,2))
+hist( stacked_data$X..Hits[substr(stacked_data$id,1,1) == "B"], breaks=c(seq(1,1000,25),6000),xlim=c(0,500),
+main="BF SEED 3 categories", xlab="read counts")
+hist( stacked_data$X..Hits[substr(stacked_data$id,1,1) == "F"], breaks=c(seq(1,1000,25),6000),xlim=c(0,500),
+main="FF SEED 3 categories", xlab="read counts")
+
+read_counts_2nd = NULL
+for(i in 7:12)#1:6)
+{
+for(s in 1:length(SEEDlevel1))
+{
+
+SEEDlevel2 = unique(stacked_data$Subsystem.Hierarchy.2[
+		stacked_data$id == the_samples[i] & 
+		stacked_data$Subsystem.Hierarchy.1 == SEEDlevel1[s] ] ) 
+
+for(ss in 1:length(SEEDlevel2))
+{
+	read_counts_2nd = c(read_counts_2nd, sum(stacked_data$X..Hits[
+	stacked_data$id == the_samples[i] & 
+	stacked_data$Subsystem.Hierarchy.1 == SEEDlevel1[s] & 
+	stacked_data$Subsystem.Hierarchy.2 == SEEDlevel2[ss] ] ) )
+}
+}
+}
+hist(read_counts_2nd)
+#bf_read_counts_2nd=read_counts_2nd
+#ff_read_counts_2nd=read_counts_2nd
+
+hist(bf_read_counts_2nd, main="BF SEED 2 categories", xlab="read counts", xlim=c(0, 1500), breaks=c(seq(0,1500,100),6000) )
+hist(ff_read_counts_2nd, main="FF SEED 2 categories", xlab="read counts", xlim=c(0, 1500), breaks=c(seq(0,1500,100),6000) )
+
+
+}
+
+par(mfrow=c(1,1))
+par(mar=c(4,3,2,1))
+plot(data_percents[,1],type='l',ylim=c(0,.35),axes=FALSE,xlab="",ylab="")
+title(first_level_choice)
+for(i in 1:length(the_samples))
+{
+	colr='green'
+	if(i > 6)
+	{
+		colr='blue'
+	}	
+	lines(data_percents[,i],col=colr)
+}
+axis(2)
+axis(1, 1:length(SEEDlevel1), as.character(SEEDlevel1), las=2,cex.axis=.75)
+legend('top', c("BF","FF"), fill=c('green','blue')) 
+
+#printing out parplots
+
+
+
+# this is supposed to be a better representation of the SEED level 1
+ranked_order = sort(apply(data_percents,1,mean),index.return=TRUE,decreasing=TRUE)$ix
+ordered_data_percents = data_percents[ranked_order,]
+
+par(mar=c(12,4,3,2))
+boxplot(t(ordered_data_percents[1,7:12]),at=.8,xlim=c(1,27),ylim=c(0,.21),col="blue",
+ylab="Proportion")
+boxplot(t(ordered_data_percents[1,1:6]),at=1.2,add=TRUE,col="green")
+for(i in 2:dim(ordered_data_percents)[1])
+{
+	boxplot(t(ordered_data_percents[i,7:12]),at=i-.2,xlim=c(1,27),ylim=c(0,.21),col="blue",
+ylab="Proportion",add=TRUE)
+	boxplot(t(ordered_data_percents[i,1:6]),at=i+.2,add=TRUE,col="green")
+}
+axis(1,1:27,as.character(SEEDlevel1)[ranked_order],las=2,cex.axis=.5)
+legend("topright",legend=c("FF","BF"),fill=c("blue","green"),border=c("black","black"))
+title("SEED level 1  Metabolic Function Composition")
+
+
+
+
+DE_tests_SEED1 = 1:length(SEEDlevel1)
+DE_tests_stats_SEED1 = 1:length(SEEDlevel1)
+perms=10000-1
+test_stats=1:perms
+for(s in 1:length(SEEDlevel1))
+{
+	for(pp in 1:perms)
+	{
+		tmp = sample(1:12,12)
+		tmp = data_percents[s,tmp]
+
+		test_stats[pp] = abs(mean(tmp[1:6]) - mean(tmp[7:12]))
+	}
+	DE_tests_SEED1[s] = (1+sum(
+abs(mean(data_percents[s,1:6]) - mean(data_percents[s,7:12])) <= test_stats))/(1+perms)	
+DE_tests_stats_SEED1[s] = mean(data_percents[s,1:6]) - mean(data_percents[s,7:12])
+}
+names(DE_tests_SEED1)=SEEDlevel1
+sort(DE_tests_SEED1)
+plot(DE_tests_stats_SEED1)
+
+put_out = cbind(as.character(SEEDlevel1),DE_tests_SEED1, DE_tests_stats_SEED1, data_counts,data_percents)
+put_out = data.frame(put_out)
+names(put_out) = c("SEED1","perm_pvalue","BF_SEED1_ave-FF_SEED1_ave",as.character(the_samples),as.character(the_samples))
+
+write.table(put_out, "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED1_DE.txt",
+sep='\t', col.names=TRUE,row.names=FALSE)
+
+put_out=read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED1_DE.txt",
+sep='\t', header=TRUE)
+
+SEEDlevel1= put_out[,1]
+DE_tests_SEED1 = put_out[,2]
+DE_tests_stats_SEED1 = put_out[,3]
+data_counts = put_out[,4:(4+11)]
+data_percents = put_out[,16:(16+11)]
+
+# let's do a curve test overall to see if they can be different
+# okay, so this doesn't come out significant, but it too heavily favors 
+# the bigger percent contributors 
+perms=10000-1
+test_stats=1:perms
+for(pp in 1:perms)
+{
+	tmp = sample(1:12,12)
+	tmp = data_percents[,tmp]
+	test_stats[pp] = sum(abs(apply(tmp[,1:6],1,mean) - apply(tmp[,7:12],1,mean)))	
+}	
+sum(abs(apply(data_percents[,1:6],1,mean) - apply(data_percents[,7:12],1,mean)))
+(1+sum(test_stats>=sum(abs(apply(data_percents[,1:6],1,mean) - apply(data_percents[,7:12],1,mean)))))/
+(perms+1)
+
+
+
+
+
+#the top level
+# actually, more like this is SEED level 2 stuff
+# I guess we're seeing what SEED level 1 stuff varies as a whole 
+# in seed level 2
+SEEDlevel1=unique(stacked_data$Subsystem.Hierarchy.1)
+matrix(0,nrow=length(SEEDlevel1), ncol=12)
+
+#the second level
+SEEDlevel1=unique(stacked_data$Subsystem.Hierarchy.1)
+level2_chisq.test.outputs = 1:length(SEEDlevel1)
+bf_ff_permutation_test = 1:length(SEEDlevel1)
+names(level2_chisq.test.outputs) = SEEDlevel1
+
+# differential testing on a per unit basis:
+DE_tests_SEED2 = NULL
+test_stats_values=NULL
+test_stats_data=NULL
+
+for(s in 1:length(SEEDlevel1))
+{
+
+first_level_choice= SEEDlevel1[s] #for example, just choosing this one for now
+SEEDlevel2=unique(stacked_data$Subsystem.Hierarchy.2[stacked_data$Subsystem.Hierarchy.1==first_level_choice])
+
+data_counts = matrix(0,nrow=length(SEEDlevel2), ncol=12)
+
+for(i in 1:12)
+for(j in 1:length(SEEDlevel2))
+{{
+	data_counts[j,i]=sum(stacked_data$X..Hits[
+stacked_data$Subsystem.Hierarchy.1==first_level_choice
+& 
+stacked_data$id==the_samples[i]
+&
+stacked_data$Subsystem.Hierarchy.2 == SEEDlevel2[j]
+])
+}}
+
+level2_chisq.test.outputs[s] = chisq.test(data_counts)$p.value
+
+# first 6 samples are BF . second 6 are FF
+# this makes the null distribution of permuting labels
+# testing curves versus curves
+# another way to do this is to just test each level individually.. i'm gonna try 
+# that way
+
+# i guess i don't like full curve testing because it's dominated too much by big percentage categories..
+# well.. actually, i guess that's a plus when it's the big categories that are driving the differences..
+# which would be the most interesting case . 
+
+if(1==0)#I don't want to do this it takes too long. this is aparently doing curve testing
+{
+
+bf_ff_permutation_test[s] = NA
+if(dim(data_counts)[1]>1)
+{
+
+null_dist = 1:9999#yikes, add 1 more 9 and this thing takes forever!
+for(perm in 1:9999)
+{
+	the_new_bf = sample(1:12,6)
+	the_new_ff = setdiff(1:12, the_new_bf)
+
+	# columns are samples
+	# rows are categories
+	t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum))
+	the_new_ff_ave = apply(t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum)),1,mean)
+
+	t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum))
+	the_new_bf_ave = apply(t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum)),1,mean)
+
+	null_dist[perm] = sum(abs(the_new_ff_ave - the_new_bf_ave))
+
+	#hist(null_dist[1:perm])
+}
+the_new_bf = 1:6
+the_new_ff = 7:12
+# columns are samples
+# rows are categories
+t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum))
+the_new_ff_ave = apply(t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum)),1,mean)
+t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum))
+the_new_bf_ave = apply(t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum)),1,mean)
+
+bf_ff_permutation_test[s] = sum(sum(abs(the_new_ff_ave - the_new_bf_ave))<=null_dist)/(length(null_dist)+1)
+}
+
+
+
+postscript(paste("~/Desktop/ChapkinLab/Iddo/SEED_level_2/", first_level_choice,".ps",sep=""), horizontal=FALSE,width=5,height=8)
+par(mar=c(20,5,5,5))
+plot(data_counts[,1]/sum(data_counts[,1]),type='l',ylim=c(0,1),axes=FALSE,xlab="",ylab="")
+title(first_level_choice)
+for(i in 1:length(the_samples))
+{
+	colr='green'
+	if(i > 6)
+	{
+		colr='blue'
+	}	
+	lines(data_counts[,i]/sum(data_counts[,i]),col=colr)
+}
+axis(2)
+axis(1, 1:length(SEEDlevel2), as.character(SEEDlevel2), las=2,cex.axis=.75)
+legend('top', c("BF","FF"), fill=c('green','blue')) 
+dev.off()
+
+}#end if to not do this.. from the complaint above that this is too long 
+
+
+
+
+data_percents = t(t(data_counts)/apply(data_counts,2,sum))
+apply(data_percents,2,sum)
+
+perms=10000-1
+test_stats=1:perms
+
+#DE_tests_SEED2=NULL 
+#test_stats_values=NULL
+#test_stats_data=NULL
+for(ss in 1:length(SEEDlevel2))
+{
+DE_tests_SEED2 = c(DE_tests_SEED2, NA)
+names(DE_tests_SEED2)[length(DE_tests_SEED2)] = paste(SEEDlevel1[s], "-",SEEDlevel2[ss])
+
+	for(pp in 1:perms)
+	{
+		tmp = sample(1:12,12)
+		tmp = data_percents[ss,tmp]		
+		test_stats[pp] = abs(mean(tmp[1:6]) - mean(tmp[7:12]))
+	}
+	DE_tests_SEED2[length(DE_tests_SEED2)] = (1+sum(
+abs(mean(data_percents[ss,1:6]) - mean(data_percents[ss,7:12])) <= test_stats))/(1+perms)	
+
+	tmp = data_percents[ss,1:12]
+	test_stats_values = c(test_stats_values, mean(tmp[1:6]) - mean(tmp[7:12]))
+	test_stats_data = rbind(test_stats_data, c(data_counts[ss,], data_percents[ss,])) 
+}
+}
+
+# these ones here are for the thing right below,
+# which is finding the overall proportion of reads in these things 
+t(t(test_stats_data[,1:12])/number_SEED_hits)
+(test_stats_data[162,1:12])/number_SEED_hits
+
+# we gotta get the proportion of all reads overall
+# so this little bit counts the number of assigned things 
+number_SEED_hits = 1:12
+for(i in 1:12)
+{
+	number_SEED_hits[i] = sum(stacked_data$X..Hits[stacked_data$id==the_samples[i]]) 
+}
+
+DE_tests_SEED2_names = names(DE_tests_SEED2)
+SEED2_individual_DEtests = data.frame(DE_tests_SEED2_names, as.numeric(DE_tests_SEED2), test_stats_values, test_stats_data,t(t(test_stats_data[,1:12])/number_SEED_hits))
+names(SEED2_individual_DEtests) = c("category", "permutation_test", "BF-FF", as.character(the_samples),as.character(the_samples),as.character(the_samples))
+
+write.table(SEED2_individual_DEtests, "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED2_DE2.txt",
+sep='\t', col.names=TRUE)
+hist(DE_tests_SEED2)
+
+# here, we just download what we processed..
+# so, now, we're gonna do our nunber of reads too small check. 
+SEED2_put_out = 
+read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED2_DE2.txt", sep='\t', header=TRUE)
+names(SEED2_put_out)
+dim(SEED2_put_out)
+
+DE_tests_SEED2_names = SEED2_put_out[,1]
+DE_tests_SEED2 = SEED2_put_out[,2]
+test_stats_values = SEED2_put_out[,3]
+SEED2_number_reads = SEED2_put_out[,4:(4+11)] 
+SEED2_relative_percent = SEED2_put_out[,16:(16+11)] 
+SEED2_overal_percent = SEED2_put_out[,28:(28+11)] 
+
+
+dim(SEED2_number_reads)
+# 162 seed 2 categories
+
+sum(apply(SEED2_number_reads>100,1,sum)==12)
+# 32 have read counts greater than 32
+
+good_enough_depth = apply(SEED2_number_reads>100,1,sum)==12 & apply(SEED2_overal_percent>.005,1,sum)==12
+sum(apply(SEED2_number_reads>100,1,sum)==12 & apply(SEED2_overal_percent>.005,1,sum)==12)
+# 28 also have at least half a percent depth
+
+DE_tests_SEED2_names[good_enough_depth]
+DE_tests_SEED2[good_enough_depth]
+
+
+
+
+
+#HERE WE'RE WORKING WITH THE LAST LEVEL
+# gotta create these into an everyone last level data set. 
+sum(stacked_data$X..Hits>100)
+# I guess we actually just need to go with the thing I made before.. below
+
+
+
+
+#some scratch work for iddo
+T6SS (Type 6 secretion systems)
+sort(as.character(unique(stacked_data$Subsystem.Name)))
+sort(as.character(unique(stacked_data$Subsystem.Hierarchy.2)))
+stacked_data[stacked_data$Subsystem.Name=="Type_VI_secretion_systems",c(1,5)]
+cbind(as.character(the_samples), number_SEED_hits)
+
+
+
+
+
+level2_chisq.test.outputs #it's all mad significant
+
+SEED1_SEED2_bf_ff_permutation_test = bf_ff_permutation_test
+names(SEED1_SEED2_bf_ff_permutation_test)=SEEDlevel1
+
+# so, here we're doing all our top level (SEED1) tests: 
+# We did the individual tests before, and we load them, here:
+put_out=read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED1_DE.txt",
+sep='\t', header=TRUE)
+# and we've just now done curve tests.. so, curve tests on the second level,.. which is kinda like
+# a test of the first level.. if second level curves are distinct.. then first level stuff (differences)
+# are likely. 
+SEEDlevel1= put_out[,1]
+DE_tests_SEED1 = put_out[,2]
+DE_tests_stats_SEED1 = put_out[,3]
+data_counts = put_out[,4:(4+11)]
+data_percents = put_out[,16:(16+11)]
+
+#so, here's the main thing: we have two tests: 
+
+enough_data = 
+apply(data_percents > .015,1,sum)==12 & apply(data_counts > 200,1,sum)==12
+
+cbind(names(SEED1_SEED2_bf_ff_permutation_test), DE_tests_SEED1, DE_tests_stats_SEED1, "SEED1_SEED2_bf_ff_permutation_test"=as.numeric(SEED1_SEED2_bf_ff_permutation_test))[enough_data,]
+
+
+cbind(
+qvalue((DE_tests_SEED1[enough_data])[1:11])$q, 
+qvalue(as.numeric(SEED1_SEED2_bf_ff_permutation_test[enough_data])[1:11])$q)
+
+qvalue(
+c((DE_tests_SEED1[enough_data])[1:11], as.numeric(SEED1_SEED2_bf_ff_permutation_test[enough_data])[1:11])
+)$q
+ 
+
+cbind(
+p.adjust((DE_tests_SEED1[enough_data])[1:11],method="fdr"), 
+p.adjust(as.numeric(SEED1_SEED2_bf_ff_permutation_test[enough_data])[1:11],method="none"))
+
+
+
+# so, we're trying to limit what we're testing here
+# let's do two cut offs. .
+# 
+sort(DE_tests_SEED1[apply(data_percents > .015,1,sum)==12 & apply(data_counts > 100,1,sum)==12])
+
+qvalue(sort(DE_tests_SEED1[apply(data_percents > .015,1,sum)==12 & apply(data_counts > 100,1,sum)==12]))$q
+p.adjust(sort(DE_tests_SEED1[apply(data_percents > .015,1,sum)==12 & apply(data_counts > 100,1,sum)==12]),method="fdr")
+
+
+
+
+
+write.table(sort(SEED1_SEED2_bf_ff_permutation_test), "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED12_BF_FF_curve.txt",
+sep='\t', col.names=FALSE)
+
+
+
+
+
+interestingOnes = bf_ff_permutation_test<.1
+interestingOnes[is.na(interestingOnes)]=0
+SEEDlevel1[interestingOnes==1]
+#
+# [1] Respiration                 Clustering-based subsystems
+# [3] Cell Wall and Capsule       Virulence  
+
+
+
+
+
+#the third level
+SEEDlevel1=unique(stacked_data$Subsystem.Hierarchy.1)
+level3_chisq.test.outputs=NULL
+bf_ff_permutation_test=NULL
+ii=1 
+for(s in 1:length(SEEDlevel1))
+{	
+	first_level_choice= SEEDlevel1[s] #for example, just choosing this one for now
+	SEEDlevel2=unique(stacked_data$Subsystem.Hierarchy.2[stacked_data$Subsystem.Hierarchy.1==first_level_choice])	
+	for(ss in 1:length(SEEDlevel2))
+	{
+
+		second_level_choice= SEEDlevel2[ss] #for example, just choosing this one for now
+		SEEDlevel3=unique(stacked_data$Subsystem.Name[stacked_data$Subsystem.Hierarchy.1==first_level_choice & stacked_data$Subsystem.Hierarchy.2==second_level_choice])
+		data_counts = matrix(0,nrow=length(SEEDlevel3), ncol=12)
+		for(sss in 1:length(SEEDlevel3))
+		{
+			for(i in 1:12)
+			{
+				data_counts[sss,i]=sum(stacked_data$X..Hits[
+				stacked_data$Subsystem.Hierarchy.1==first_level_choice
+				&
+				stacked_data$Subsystem.Hierarchy.2==second_level_choice
+				&
+				stacked_data$id==the_samples[i]
+				&
+				stacked_data$Subsystem.Name == SEEDlevel3[sss]])
+			}
+		}
+
+bf_ff_permutation_test = c(bf_ff_permutation_test, NA)
+if(dim(data_counts)[1]>1)
+{
+
+null_dist = 1:9999
+for(perm in 1:9999)
+{
+	the_new_bf = sample(1:12,6)
+	the_new_ff = setdiff(1:12, the_new_bf)
+
+	# columns are samples
+	# rows are categories
+	t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum))
+	the_new_ff_ave = apply(t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum)),1,mean)
+
+	t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum))
+	the_new_bf_ave = apply(t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum)),1,mean)
+
+	null_dist[perm] = sum(abs(the_new_ff_ave - the_new_bf_ave))
+
+	#hist(null_dist[1:perm])
+}
+the_new_bf = 1:6
+the_new_ff = 7:12
+# columns are samples
+# rows are categories
+t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum))
+the_new_ff_ave = apply(t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum)),1,mean)
+t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum))
+the_new_bf_ave = apply(t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum)),1,mean)
+
+bf_ff_permutation_test[ii] = sum(sum(abs(the_new_ff_ave - the_new_bf_ave))<=null_dist)/(length(null_dist)+1)
+}
+
+
+		#this is a chi-square assumption.. we're not looking at anything that's low counts.. 
+		#that's what we should be doing anyway 
+		use_these_only = data_counts > 5
+		use_these_only = apply(use_these_only,1,sum)==12
+
+		if(sum(use_these_only)>1) # 0 is not interesting, obviously.. and if there's just 1.. 
+									# then well, there's no test.   
+		{
+			level3_chisq.test.outputs = 
+			c(level3_chisq.test.outputs, chisq.test(data_counts[use_these_only,])$p.value)
+		}
+		if(sum(use_these_only)<=1) 
+		{
+			level3_chisq.test.outputs = 
+			c(level3_chisq.test.outputs, NA)
+		}
+		names(level3_chisq.test.outputs)[ii] = paste(SEEDlevel1[s], " - ", SEEDlevel2[ss],sep="")
+		ii=ii+1
+
+		formatted_string = names(level3_chisq.test.outputs)[ii-1]	
+		substring(formatted_string,regexpr("/",formatted_string),regexpr("/",formatted_string))= " - "
+		while(regexpr("/",formatted_string)!=-1)
+		{
+			substring(formatted_string,regexpr("/",formatted_string),regexpr("/",formatted_string))= " - "
+		}
+		formatted_string = paste("~/Desktop/ChapkinLab/Iddo/SEED_level_2/SEED_level_3/", formatted_string,".ps",sep="")
+
+		postscript(formatted_string, horizontal=FALSE,width=5,height=8)
+		par(mar=c(20,5,5,5))
+		plot(data_counts[,1]/sum(data_counts[,1]),type='l',ylim=c(0,1),axes=FALSE,xlab="",ylab="")	
+
+
+		tmp1=""
+		tmp = apply(data_counts,2,sum)
+		for(i in 1:12)
+			tmp1 = paste(tmp1, tmp[i])
+
+		title(c(names(level3_chisq.test.outputs)[ii-1], tmp1)) 
+		for(i in 1:length(the_samples))
+		{
+			colr='green'
+			if(i > 6)
+			{
+				colr='blue'
+			}	
+
+			lines(data_counts[,i]/sum(data_counts[,i]),col=colr)
+			axis(2)
+			axis(1, 1:length(SEEDlevel3), as.character(SEEDlevel3), las=2,cex.axis=.75)
+		}	
+		legend('top', c("BF","FF"), fill=c('green','blue')) 
+		dev.off()
+	}
+}
+
+as.numeric(level3_chisq.test.outputs)
+
+
+#SEED2_SEED3_bf_ff_permutation_test = bf_ff_permutation_test
+#names(SEED2_SEED3_bf_ff_permutation_test)=names(level3_chisq.test.outputs)
+
+write.table(sort(SEED2_SEED3_bf_ff_permutation_test), "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED23_BF_FF_curve.txt",
+sep='\t', col.names=FALSE)
+
+
+interesting_ones = bf_ff_permutation_test<.1
+interesting_ones[is.na(interesting_ones)] = 0
+names(level3_chisq.test.outputs)[interesting_ones ==1]
+# [1] "Respiration - ATP synthases"                                     
+# [2] "Respiration - Electron donating reactions"                       
+# [3] "Respiration - Respiration"                                       
+# [4] "Carbohydrates - CO2 fixation"                                    
+# [5] "Carbohydrates - Monosaccharides"                                 
+# [6] "Clustering-based subsystems - Translation"                       
+# [7] "Cofactors, Vitamins, Prosthetic Groups, Pigments - NAD and NADP" 
+# [8] "Cofactors, Vitamins, Prosthetic Groups, Pigments - Tetrapyrroles"
+# [9] "Virulence - Resistance to antibiotics and toxic compounds"       
+#[10] "Miscellaneous - Miscellaneous"         
+
+
+
+
+# metabolic DE testing on SEED 3 
+# doing differential testing at the last level should be a little easier
+
+bottom_level = paste(stacked_data$Subsystem.Hierarchy.1, "-", stacked_data$Subsystem.Hierarchy.2, "-", stacked_data$Subsystem.Name)
+
+DE_tests_SEED3 = NULL
+DE_tests_stats_SEED3 = NULL
+data_counts = NULL
+data_relative_percents = NULL
+data_overall_percents = NULL
+n_sizes = NULL
+for( go in unique(bottom_level))
+{
+	current_data = rep(0,12)
+	current_data_n = rep(0,12)
+	for(i in 1:12)
+	{
+		this_one = which(stacked_data$id==the_samples[i] & 
+		go == paste(stacked_data$Subsystem.Hierarchy.1, "-", stacked_data$Subsystem.Hierarchy.2, "-", stacked_data$Subsystem.Name))
+		if(length(this_one)==1)
+		{
+			current_data_n[i] = stacked_data$X..Hits[this_one]
+			current_data[i] = stacked_data$X..Hits[this_one]/ 
+sum(stacked_data[
+which(stacked_data$id[this_one] == stacked_data$id &
+paste(stacked_data$Subsystem.Hierarchy.1[this_one], "-", stacked_data$Subsystem.Hierarchy.2[this_one]) ==
+paste(stacked_data$Subsystem.Hierarchy.1, "-", stacked_data$Subsystem.Hierarchy.2)),5])
+		}		
+	}
+
+if(1==0)
+{
+	perms=10000-1
+	test_stats=1:perms
+	for(j in 1:perms)
+	{ 	
+		tmp=sample(1:12,12)
+		tmp=current_data[tmp]
+		test_stats[j] = abs(mean(tmp[1:6]) - mean(tmp[7:12]))
+	}
+
+	DE_tests_SEED3 = c(DE_tests_SEED3, (1+sum(
+abs(mean(current_data[1:6]) - mean(current_data[7:12])) <= test_stats))/(1+perms))
+	names(DE_tests_SEED3)[length(DE_tests_SEED3)]=go	
+}
+	data_overall_percents = rbind(data_overall_percents, current_data_n/number_SEED_hits)
+	data_relative_percents = rbind(data_relative_percents, current_data) 
+	n_sizes = c(n_sizes, sum(current_data_n))
+	data_counts = rbind(data_counts, current_data_n)
+	DE_tests_stats_SEED3 = c(DE_tests_stats_SEED3, mean(current_data[1:6]) - mean(current_data[7:12]))
+} 
+
+
+SEED3_putout = 
+data.frame(names(DE_tests_SEED3), DE_tests_SEED3, n_sizes, data_counts,
+ data_overall_percents, data_relative_percents) 
+names(SEED3_putout) = 
+c("name","perm.p", "total_n", "data_counts", "overall_percents", "relative_percents")
+
+write.table(SEED3_putout, "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED3_DE2.txt",
+sep='\t', col.names=TRUE)
+
+SEED3_put_out = read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED3_DE2.txt",
+sep='\t',header=TRUE)
+
+
+DE_tests_SEED3_names = SEED3_put_out[,1]
+DE_tests_SEED3 = SEED3_put_out[,2]
+test_stats_values = SEED3_put_out[,3]
+SEED3_number_reads = SEED3_put_out[,4:(4+11)] 
+SEED3_relative_percent = SEED3_put_out[,16:(16+11)] 
+SEED3_overal_percent = SEED3_put_out[,28:(28+11)] 
+
+
+SEED3_average_read_count = apply(SEED3_number_reads, 1, mean)
+
+signif(
+c(
+sum(SEED3_average_read_count<10)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=10 & SEED3_average_read_count<100)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=100 & SEED3_average_read_count<200)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=200 & SEED3_average_read_count<500)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=500 & SEED3_average_read_count<1000)/length(SEED3_average_read_count), 
+sum(SEED3_average_read_count>=1000)/length(SEED3_average_read_count)
+)
+,2)
+
+
+
+
+
+
+# now we're thinking about doing some cannonical correlation, factor analysis.. maybe more pca 
+# let's play with the virulence stuff
+
+
+# working with a SEED 2nd level category?
+
+names(stacked_data)
+
+SEED1choice='Virulence' 
+SEEDlevel2=unique(stacked_data$Subsystem.Hierarchy.2[stacked_data$Subsystem.Hierarchy.1 == SEED1choice] )
+SEED2matrix = matrix(0, nrow=length(SEEDlevel2), ncol=12)
+for(i in 1:12)
+{
+for(ss in 1:length(SEEDlevel2))
+{
+	SEED2matrix[ss,i] = sum( stacked_data$X..Hits[stacked_data$id==the_samples[i] & 
+				 stacked_data$Subsystem.Hierarchy.1==SEED1choice & 
+				 stacked_data$Subsystem.Hierarchy.2== SEEDlevel2[ss] ])
+}
+}
+
+
+lookATthese = SEED2matrix > 5
+lookATthese = apply(lookATthese, 1, sum) >= 8
+
+SEED2matrix = SEED2matrix/matrix(apply(SEED2matrix, 2,sum), byrow=TRUE, nrow=dim(SEED2matrix)[1], ncol=dim(SEED2matrix)[2])
+
+SEED2matrix = SEED2matrix[lookATthese, ]
+
+SEEDlevel2[lookATthese]
+
+dim(SEED2matrix)
+#4x12
+# 12 samples
+# 4 variables (this we'll call dimension p) 
+# so, 4 equations.. 12 times .. each of the 12 times gets its own f's
+# actually --  x should be nXp . . so have to transpose it 
+# that's what we have 
+# now we select k 
+
+
+
+cor(t(SEED2matrix))
+qr(cor(t(SEED2matrix)))$rank
+solve(cor(t(SEED2matrix)))
+
+factanal(t(SEED2matrix),1,covmat=cor(t(SEED2matrix)), n.obs=12)
+# there a limit to the number of factors you can fit relative to number of tests you have 
+
+#factanal(t(SEED2matrix),2,covmat=cor(t(SEED2matrix)), n.obs=12)
+
+factanal(t(SEED2matrix[c(2,1,3,5,4),]),2,covmat=cor(t(SEED2matrix[c(2,1,3,5,4),])), n.obs=12)
+(SEEDlevel2[lookATthese])[c(2,1,3,5,4)]
+
+
+cor(t(SEED2matrix[c(2,1,3,5,4),]))
+
+plot(data.frame(t(SEED2matrix[c(2,1,3,5,4),])))
+
+
+
+Ls = factanal(t(SEED2matrix[c(2,1,3,5,4),]),2, scores="Bartlett", n.obs=12)$loadings[1:5,]
+Fs = factanal(t(SEED2matrix[c(2,1,3,5,4),]),2, scores="Bartlett", n.obs=12)$scores
+
+What do our factors find?
+outputs = Ls %*% t(Fs)
+
+
+par(mar=c(20,4,3,2))
+plot(outputs[c(2,1,3,5,4),1],type="l", ylim=c(-2,2), axes=FALSE,col='green',xlab="",ylab="")
+for(i in 2:dim(SEED2matrix)[2])
+{
+	colr='green'
+	if(i>6)
+	colr='blue'
+		
+	lines(outputs[,i], col=colr)
+}
+axis(2)
+axis(1, 1:5, (SEEDlevel2[lookATthese])[c(2,1,3,5,4)],las=2)
+
+# so, it looks to me like this is actually working well.. but i need to get more of a clue
+# okay, what's gonna happen now.. is..
+# we're gonna forget about the raw percentages.. everything gets normalized. 
+# that's a lot of info loss.. but, maybe things work relative anyway. 
+
+
+
+factanal(t(SEED2matrix[c(2,1,3,5,4),]),2,covmat=cor(t(SEED2matrix[c(2,1,3,5,4),])), n.obs=12)
+factanal(t(SEED2matrix[c(2,1,3,5,4),]),2, n.obs=12)
+
+
+
+meta_genome_set = c(2,3,5) # c(2,3,5) # c(2,1,3,5,4) # 
+
+scaledSEED2matrix = SEED2matrix
+for(i in 1:dim(scaledSEED2matrix)[1])
+{
+	scaledSEED2matrix[i,] = scale(scaledSEED2matrix[i,])
+}
+
+par(mfrow=c(1,2))
+par(mar=c(10,4,3,2))
+plot(SEED2matrix[meta_genome_set,1],type="l",ylim=c(0,.8), axes=FALSE,col='green',xlab="",ylab="")
+for(i in 2:dim(SEED2matrix)[2])
+{
+	colr='green'
+	if(i>6)
+	colr='blue'
+		
+	lines(SEED2matrix[meta_genome_set,i], col=colr)
+}
+axis(2)
+#axis(1, 1:length(meta_genome_set), (SEEDlevel2[lookATthese])[meta_genome_set],las=1,cex.axis=.25)
+#axis(1, 1:length(meta_genome_set), c("A-biotics + toxics resistance","Iron Savenging","Virulence"),las=1,cex.axis=.75)
+axis(1, 1:length(meta_genome_set), c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"),las=1,cex.axis=.75)
+
+
+par(mar=c(10,4,3,2))
+plot(scaledSEED2matrix[meta_genome_set,1],type="l", ylim=c(-2,2), axes=FALSE,col='green',xlab="",ylab="")
+for(i in 2:dim(SEED2matrix)[2])
+{
+	colr='green'
+	if(i>6)
+	colr='blue'
+		
+	lines(scaledSEED2matrix[meta_genome_set,i], col=colr)
+}
+axis(2)
+#axis(1, 1:length(meta_genome_set), (SEEDlevel2[lookATthese])[meta_genome_set],las=1,cex.axis=.25)
+#axis(1, 1:length(meta_genome_set), c("A-biotics + toxics resistance","Iron Savenging","Virulence"),las=1,cex.axis=.75)
+axis(1, 1:length(meta_genome_set), c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"),las=1,cex.axis=.75)
+
+
+
+
+
+
+
+# HOST SIDE
+# things weren't matched up.. that might have been a problem.
+scotts_Immunology_set = scotts_Immunology_set[,c(12,11,10,9,8,7,6,5,3,2,1,4)]
+scotts_Immunology_set = t(scotts_Immunology_set) 
+#scotts_Immunology_set_ids = row.names(scotts_Immunology_set)
+scotts_Immunology_set = as.matrix(scotts_Immunology_set) 
+scotts_Immunology_set = data.frame(scotts_Immunology_set) 
+#row.names(scotts_Immunology_set) = scotts_Immunology_set_ids
+names(scotts_Immunology_set) = samples_Annotation_OGS_Loessed_Immuno[a_small_interesting_Immunology_subset]
+
+par(mfrow=c(1,2))
+par(mar=c(10,4,3,2))
+plot(as.numeric(scotts_Immunology_set[1,]),type="l", axes=FALSE,col='green',xlab="",ylab="",ylim=c(6,10))
+for(i in 2:dim(scotts_Immunology_set)[1])
+{
+	colr='green'
+	if(i>6)
+	colr='blue'
+		
+	lines(as.numeric(scotts_Immunology_set[i,]), col=colr)
+}
+axis(2)
+axis(1, 1:length(names(scotts_Immunology_set)), names(scotts_Immunology_set),las=1,cex.axis=1)
+
+scaled_scotts_Immunology_set = scotts_Immunology_set
+for(i in 1:dim(scotts_Immunology_set)[2])
+{
+	scaled_scotts_Immunology_set[,i] = scale(as.numeric(scotts_Immunology_set[,i]))
+}
+#par(mar=c(20,4,3,2))
+plot(as.numeric(scotts_Immunology_set[1,]),type="l", axes=FALSE,col='green',xlab="",ylab="",ylim=c(-2,2))
+for(i in 2:dim(scotts_Immunology_set)[1])
+{
+	colr='green'
+	if(i>6)
+	colr='blue'
+		
+	lines(as.numeric(scaled_scotts_Immunology_set[i,]), col=colr)
+}
+axis(2)
+axis(1, 1:length(names(scotts_Immunology_set)), names(scotts_Immunology_set),las=1,cex.axis=1)
+
+
+# BACTERIA SIDE 
+
+# SEEDlevel2[lookATthese] 
+meta_genome_set = c(2,3,5) #c(2,1,3,5,4)
+scotts_Virulence_set = t(SEED2matrix[meta_genome_set,])
+scotts_Virulence_set = data.frame(scotts_Virulence_set)
+names(scotts_Virulence_set) = as.character((SEEDlevel2[lookATthese])[meta_genome_set])
+row.names(scotts_Virulence_set) = row.names(scotts_Immunology_set)
+
+
+scaledSEED2matrix
+scaled_scotts_Immunology_set
+
+
+# BOTH
+proto_demo = data.frame(scotts_Virulence_set, scotts_Immunology_set)
+dim(proto_demo)
+proto_demo_scaled = proto_demo
+for(i in 1:dim(proto_demo)[2])
+{
+	proto_demo_scaled[,i] = scale(proto_demo[,i])
+} 
+plot(proto_demo_scaled)
+
+
+names(proto_demo_scaled)
+plot(proto_demo_scaled$GAB1,proto_demo_scaled$FCGR2A)
+
+
+tmp = cor(proto_demo_scaled)
+#diag(tmp)=seq(1,-1,-2/(dim(proto_demo_scaled)[2]-1))
+tmp = tmp[,seq(dim(tmp)[2],1,-1)]
+par(mfrow=c(1,1))
+par(mar=c(7,7,3,2))
+image(1:dim(proto_demo_scaled)[2],1:dim(proto_demo_scaled)[2],tmp,axes=FALSE,xlab="",ylab="",
+main="Bacteria and Host Corelation Structure",col=terrain.colors(6))
+colrs=seq(1,-1,-2/(dim(proto_demo_scaled)[2]-1))
+
+tmp = cor(proto_demo_scaled)
+for(i in 1:(dim(proto_demo_scaled)[1]))
+{
+for(j in 1:(dim(proto_demo_scaled)[2]))
+{
+	text(i,7-j, signif(tmp[i,j],2))
+}
+}
+
+#axis(1,1:10, c(names(scotts_Virulence_set), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+#axis(2,1:10, c(names(scotts_Virulence_set), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+axis(1,1:dim(proto_demo_scaled)[2], c(c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+axis(2,1:dim(proto_demo_scaled)[2], c(c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"), names(scotts_Immunology_set))[seq(dim(tmp)[2],1,-1)], las=2,cex.axis=.75)
+abline(3.5,0)
+lines(c(3.5,3.5),c(-10,10) )
+
+
+
+
+
+
+#step 1: demonstrate PCA
+# we've standardized this all.. this means the axis of variation are resulting from an "equal" use of
+# all the data dimensions 
+
+
+XX=(proto_demo_scaled)#/sqrt(11))
+# this is the standard format -- cols of XX are samples; rows of XX are measures.
+# NOTE THAT WE ARE NORMALIZING. SO WE'RE THINKING
+# MAGNITUDES ARE IMPORTANT. i.e. SMALL % THINGS DON'T MATTER.
+
+dim(XX) 
+### X[10x12]=U[10xL]D[LxR]V[12XR]'
+
+# this gives proportions
+scaled_data_SVD = svd(XX,nu=6,nv=12)
+
+#u d v'
+scaled_data_SVD$u %*% diag(scaled_data_SVD$d) %*% t(scaled_data_SVD$v)
+proto_demo_scaled
+
+
+# these are the singular values: they are equal to the square root of the eigen values.
+# the eigen values are proportional to the explained 'variation'
+proportions=(scaled_data_SVD$d)^2
+
+# yep, that all check's out: sum of eigenvalues is the sum of distances to mean of data
+sum(apply(XX^2,1,sum)) # multidimensional mean is 0 vector.
+sum(proportions)
+
+# skri plot
+par(mfrow=c(2,1))
+par(mar=c(5,4,3,1))
+barplot(signif(proportions/sum(proportions),3), 
+names.arg=c("pc","2pc","3pc","4pc","5pc","6pc"), 
+main="Principal component eigenvalues
+(proportion of `variation' explained)")
+
+
+dimensionality = 2
+scaled_data_SVD = svd(XX,nu= dimensionality,nv=12)
+plot( 
+c(scaled_data_SVD$u %*% diag(scaled_data_SVD$d[1:dimensionality]) %*% t(scaled_data_SVD$v[,1:dimensionality] )), 
+c(as.numeric(as.matrix(proto_demo_scaled))),
+main="Principal components  
+data reconstruction",
+xlab="Dimensionalility reduced data (Rank 2)", ylab="Full rank data")
+abline(0,1)
+
+
+
+tmp = cor(cbind(as.matrix(proto_demo_scaled), as.matrix(scaled_data_SVD$u)))
+tmp = tmp[,seq(dim(tmp)[2],1,-1)]
+par(mfrow=c(1,1))
+par(mar=c(7,7,3,2))
+image(1:dim(tmp)[1],1:dim(tmp)[2],tmp,axes=FALSE,xlab="",ylab="",
+main="Bacteria and Host Corelation Structure",col=terrain.colors(6))
+colrs=seq(1,-1,-2/(dim(proto_demo_scaled)[2]-1))
+
+tmp = cor(cbind(as.matrix(proto_demo_scaled), as.matrix(scaled_data_SVD$u)))
+for(i in 1:(dim(tmp)[1]))
+{
+for(j in 1:(dim(tmp)[2]))
+{
+	text(i,(dim(tmp)[2]+1)-j, signif(tmp[i,j],2))
+}
+}
+
+#axis(1,1:10, c(names(scotts_Virulence_set), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+#axis(2,1:10, c(names(scotts_Virulence_set), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+axis(1,1:dim(tmp)[2], c(c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"), names(scotts_Immunology_set),"pc","2nd pc"), las=2,cex.axis=.75)
+axis(2,1:dim(tmp)[2], c(c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"), names(scotts_Immunology_set),"pc","2nd pc")[seq(dim(tmp)[2],1,-1)], las=2,cex.axis=.75)
+abline(2.5,0)
+abline(5.5,0)
+
+lines(c(3.5,3.5),c(-10,10) )
+lines(c(6.5,6.5),c(-10,10) )
+
+
+
+
+# biplot
+# so very cool 
+
+par(mfrow=c(1,2))
+
+plot(as.numeric(proto_demo_scaled[1,]),type="l", axes=FALSE,col='green',xlab="",ylab="",ylim=c(-2,2))
+for(i in 2:dim(proto_demo_scaled)[1])
+{
+	colr='green'
+	if(i>6)
+	colr='blue'
+		
+	lines(as.numeric(proto_demo_scaled[i,]), col=colr)
+}
+axis(2)
+axis(1, 1:length(names(proto_demo_scaled)), c(c("anti A-biotics+toxics","Type III/IV/ESAT","Virulence"), names(proto_demo_scaled)[4:6]),las=1,cex.axis=.5)
+
+plot(scaled_data_SVD$u, xlim=c(-.5,.5), ylim=c(-.6,.7),cex=2, xlab="", ylab="")
+text(scaled_data_SVD$u, as.character(the_samples), xlim=c(-.5,.5), ylim=c(-.6,.7))
+for(i in 1:dim(scaled_data_SVD$v)[1])
+{
+	lines(rbind(c(0,0), scaled_data_SVD$v[i,1:2])) 
+	text(scaled_data_SVD$v[i,1], scaled_data_SVD$v[i,2], names(proto_demo_scaled)[i], xlim=c(-.5,.5), ylim=c(-.6,.7), cex=.5)
+} 
+
+
+
+
+
+
+# some experimentation to get a handle on all this matrix business:
+
+cor(proto_demo_scaled)
+eigen(cor(proto_demo_scaled)) # the eigen values are the spectral decomposition.
+
+# the columns are the eigen values.
+# they are orthonormal.. they're unit bases..
+# so the transpose times itself is the identity.
+eigen(cor(proto_demo_scaled))$vectors %*% t(eigen(cor(proto_demo_scaled))$vectors) 
+t(eigen(cor(proto_demo_scaled))$vectors) %*% eigen(cor(proto_demo_scaled))$vectors 
+
+# but the crazy thing is..
+eigen(cor(proto_demo_scaled))$vectors %*% diag(eigen(cor(proto_demo_scaled))$values) %*% t(eigen(cor(proto_demo_scaled))$vectors) 
+# gets you back your original square matrix.. wth? awesome. it's just absolutely crazy  
+cor(proto_demo_scaled)
+
+# now, suppose we sum the eigenVALUES of a correlation matrix.
+# that's right -- of course we get the dimension.
+sum(eigen(cor(proto_demo_scaled))$values)
+
+
+# So, how does this relate to the singular value decomposition of the data matrix..? let's see: 
+
+svd(t(proto_demo_scaled)) # I like to transpose it to think about it with the eigenvectors being u
+eigen(cor(proto_demo_scaled))
+
+# so, the svd base of the "data matrix" is equal to the eigen values of the "correlation matrix" 
+svd(t(proto_demo_scaled))$u
+eigen(cor(proto_demo_scaled))$vectors
+
+# singular values and eigenvalues from each decomposition are different things, repsectively
+# it's kinda weird: 
+
+# The sum of the squared singular values is equal to the sum of squares of the original data
+sum(svd(t(proto_demo_scaled))$d^2)
+sum(proto_demo_scaled^2)
+apply(proto_demo_scaled^2,2,sum)
+# because the data has been scaled, the sum of all the squares for each observation of a given variable
+# will be equal to n-1.  so the total sum of squares is #vars * (n-1)
+# The singular values are fact the splitting of this sum of squares up
+# among the direction of of the eigen vectors
+# I can make the sum of squares be equal to the number of variables i have by 
+# "doubly normalizing" so the sum of squares for a single variable will be 1, like this: 
+sum(svd(t(proto_demo_scaled/sqrt(11)))$d^2)
+svd(t(proto_demo_scaled/sqrt(11)))$d^2
+
+# in this case, then the square of the singular values are equal to the eigen values 
+# of the correlation matrix, see here:
+eigen(cor(proto_demo_scaled))$values
+
+# The sum of the diagonal of the correlation matrix is equal to the sum of its eigenvalues
+sum(eigen(cor(proto_demo_scaled))$values)
+sum(diag(cor(proto_demo_scaled)))
+
+# note that svd and eigen are equivalent on square matricies
+eigen(cor(proto_demo_scaled))
+svd(cor(proto_demo_scaled))
+
+# also, all the business about divide by 11 doesn't matter.
+# the proportions explained remain the same
+#.. i think i must remain in the rain once more
+svd(t(proto_demo_scaled))$d^2/sum(svd(t(proto_demo_scaled))$d^2)
+eigen(cor(proto_demo_scaled))$values/sum(eigen(cor(proto_demo_scaled))$values)
+# great.. that clears all the stuff up well.
+
+
+# here's a cholesky decomposition: 
+chol(cor(proto_demo_scaled))
+# for fun .. we do a cholesky decomposition on a reduced dimension matrix..
+# the cholesky shows the sparsity of a matix
+
+cor(proto_demo_scaled)
+eigen(cor(proto_demo_scaled))$vectors %*% diag(eigen(cor(proto_demo_scaled))$values) %*% t(eigen(cor(proto_demo_scaled))$vectors) 
+
+# here's the dimension reduced form
+eigen(cor(proto_demo_scaled))$vectors[,1:2] %*% diag(eigen(cor(proto_demo_scaled))$values[1:2]) %*% t(eigen(cor(proto_demo_scaled))$vectors[,1:2]) 
+
+# you can see here the rank is two as expected 
+qr(eigen(cor(proto_demo_scaled))$vectors[,1:2] %*% diag(eigen(cor(proto_demo_scaled))$values[1:2]) %*% t(eigen(cor(proto_demo_scaled))$vectors[,1:2]))$rank 
+
+# and it's not invertable.  
+solve(eigen(cor(proto_demo_scaled))$vectors[,1:2] %*% diag(eigen(cor(proto_demo_scaled))$values[1:2]) %*% t(eigen(cor(proto_demo_scaled))$vectors[,1:2])) 
+
+# we can recover the eigen values
+eigen(eigen(cor(proto_demo_scaled))$vectors[,1:2] %*% diag(eigen(cor(proto_demo_scaled))$values[1:2]) %*% t(eigen(cor(proto_demo_scaled))$vectors[,1:2])) 
+
+# unfortunately we can't recover the cholesky decomposion.. numerical tolerance applied
+eigen(eigen(cor(proto_demo_scaled))$vectors[,1:2] %*% diag(eigen(cor(proto_demo_scaled))$values[1:2]) %*% t(eigen(cor(proto_demo_scaled))$vectors[,1:2])) 
+
+# there is another matrix decomposition called the QR decomposition.
+# I'm not sure exactly what it does but I'll find out later.. 
+
+
+
+
+
+
+# biplot
+# now we're doing a biplot of the correlation matrix.. should be interesting to see. 
+# this is how we do interpretation of the principal components, etc. 
+
+
+XX=(proto_demo_scaled)
+# this is the standard format -- cols of XX are samples; rows of XX are measures.
+# NOTE THAT WE ARE NORMALIZING. SO WE'RE THINKING
+# MAGNITUDES ARE IMPORTANT. i.e. SMALL % THINGS DON'T MATTER.
+dim(XX) 
+### X[10x12]=U[10xL]D[LxR]V[12XR]'
+# this gives proportions
+scaled_data_SVD = svd(XX,nu=6,nv=12)
+#u d v'
+scaled_data_SVD$u %*% diag(scaled_data_SVD$d) %*% t(scaled_data_SVD$v)
+proto_demo_scaled
+
+tmp = cor(as.matrix(proto_demo_scaled))
+cor_mat_meta_host_svd = svd(tmp) 
+tmp = cor(cbind(as.matrix(proto_demo_scaled), as.matrix(scaled_data_SVD$u)))
+cor_mat_meta_host_pc_svd = svd(tmp) 
+
+proportions = cor_mat_meta_host_svd$d
+proportions = cor_mat_meta_host_pc_svd$d
+par(mfrow=c(2,1))
+par(mar=c(5,4,3,1))
+barplot(signif(proportions/sum(proportions),3), 
+names.arg=c("pc","2pc","3pc","4pc","5pc","6pc","7pc","8pc"), 
+main="Principal component eigenvalues
+(proportion of `variation' explained)")
+
+
+
+cor_mat_meta_host_svd
+names(proto_demo_scaled)
+
+par(mar=c(3,3,1,1))
+cor_mat_meta_host_pc_svd
+c(c("anti A-biotics+toxics","Type III/IV/ESAT","Virulence"), names(proto_demo_scaled)[4:6], "PC", "2nd PC")
+
+plot(rbind(c(0,0), cor_mat_meta_host_svd$u[1,1:2]), xlim=c(-.6,.4), ylim=c(-.7,.5), type="l", xlab="", ylab="")
+text(cor_mat_meta_host_svd$u[1,1], cor_mat_meta_host_svd$u[1,2], labels="anti A-biotics+toxics",cex=.5)
+for(i in 2:dim(cor_mat_meta_host_svd$u)[1])
+{
+	lines(rbind(c(0,0), cor_mat_meta_host_svd$u[i,1:2])) 
+	text(cor_mat_meta_host_svd$u[i,1], cor_mat_meta_host_svd$u[i,2], c(c("anti A-biotics+toxics","Type III/IV/ESAT","Virulence"), names(proto_demo_scaled)[4:6], "PC", "2nd PC")[i], cex=.5)
+} 
+
+plot(rbind(c(0,0), cor_mat_meta_host_pc_svd$u[1,1:2]), xlim=c(-.6,.4), ylim=c(-.7,.5), type="l", xlab="", ylab="")
+text(cor_mat_meta_host_pc_svd$u[1,1], cor_mat_meta_host_pc_svd$u[1,2], labels="anti A-biotics+toxics",cex=.5)
+for(i in 2:dim(cor_mat_meta_host_pc_svd$u)[1])
+{
+	lines(rbind(c(0,0), cor_mat_meta_host_pc_svd$u[i,1:2])) 
+	text(cor_mat_meta_host_pc_svd$u[i,1], cor_mat_meta_host_pc_svd$u[i,2], c(c("anti A-biotics+toxics","Type III/IV/ESAT","Virulence"), names(proto_demo_scaled)[4:6], "PC", "2nd PC")[i], cex=.5)
+} 
+
+
+
+
+
+
+
+# I need to know how to find out what the principal components represent.. 
+# so what do they represent? 
+
+
+
+
+
+
+
+#step 2: demonstrate CCA
+
+# okay, we can scale up the canonical variates so that actually the directions
+# are unit 1 rather than fixed to having the variances of the resulting canonical variates being 1.
+# We like this for projecting the data is way that we can still break down the 
+# contribution of the variance from. .. now.. i guess the question is weather this will be useful?
+# it seems like it will capture something about how much of the original variation lies along 
+# the new basis lines of the resulting transformation
+
+getting_it_cca = canocor(proto_demo_scaled[,1:3], proto_demo_scaled[,4:6]) 
+
+ortho_cano_variates_A = 
+getting_it_cca$A/matrix(rep(sqrt(apply(getting_it_cca$A^2,2,sum)),3),nrow=3,ncol=3,byrow=TRUE)
+
+plot(getting_it_cca$U[,1], (as.matrix(proto_demo_scaled[,1:3]) %*% ortho_cano_variates_A)[,1])
+cor(
+(as.matrix(proto_demo_scaled[,1:3]) %*% ortho_cano_variates_A)[,1],
+getting_it_cca$V[,1])
+cor(
+(as.matrix(proto_demo_scaled[,1:3]) %*% ortho_cano_variates_A)[,2],
+getting_it_cca$V[,2])
+
+
+# okay, trying to get some results now.
+
+c(c("anti A-biotics+toxics","Type III/IV/ESAT","Virulence"), names(proto_demo_scaled)[4:6])
+
+diag(getting_it_cca$ccor)
+as.matrix(proto_demo_scaled[,1:3]) %*% getting_it_cca$A 
+getting_it_cca$U 
+
+getting_it_cca$B
+
+
+
+normed_cano_variates_A = 
+getting_it_cca$A/matrix(rep(sqrt(apply(getting_it_cca$A^2,2,sum)),3),nrow=3,ncol=3,byrow=TRUE)
+
+normed_cano_variates_B = 
+getting_it_cca$B/matrix(rep(sqrt(apply(getting_it_cca$B^2,2,sum)),3),nrow=3,ncol=3,byrow=TRUE)
+
+
+#this is the total sum of squares
+sum(proto_demo_scaled[,1:3]^2)
+# this of course is 33.
+
+# This is the sum of squares in the direction of canonical variate #1
+# and of canonical variate #2, and so on
+# so this is showing the variation in the original space
+apply((as.matrix(proto_demo_scaled[,1:3]) %*% normed_cano_variates_A)^2,2,sum)/33
+
+# but, you can see the relative variation once things get warped to these new directions
+apply((as.matrix(proto_demo_scaled[,1:3]) %*% normed_cano_variates_A)^2,2,sum)/
+sum((as.matrix(proto_demo_scaled[,1:3]) %*% normed_cano_variates_A)^2)
+
+# and now for the other data: 
+apply((as.matrix(proto_demo_scaled[,4:6]) %*% normed_cano_variates_B)^2,2,sum)/33
+apply((as.matrix(proto_demo_scaled[,4:6]) %*% normed_cano_variates_B)^2,2,sum)/
+sum((as.matrix(proto_demo_scaled[,4:6]) %*% normed_cano_variates_B)^2)
+
+# now, let's see how much of the variation we retain 
+# compared to PCA
+
+apply(getting_it_cca$U^2,2,sum)
+
+
+
+# I would like to look at the correlation matrix
+# I would also like to look at the biplot picture
+# we should be able to do some approximating with just two canonical variates 
+
+cor(data.frame(proto_demo_scaled, getting_it_cca$U, getting_it_cca$V))
+
+
+#library(gplots)
+tmp = data.frame(proto_demo_scaled, getting_it_cca$U, getting_it_cca$V)
+names(tmp)[7:12] = c("meta_c.v.1","host_c.v.1","meta_c.v.2","host_c.v.2","meta_c.v.3","host_c.v.3")
+tmp = cor(tmp)
+tmp = tmp[,seq(dim(tmp)[2],1,-1)]
+par(mfrow=c(1,1))
+par(mar=c(7,7,3,2))
+image(1:dim(tmp)[1],1:dim(tmp)[2],tmp,axes=FALSE,xlab="",ylab="",
+main="Bacteria and Host Canonical Correlation",col=redblue(15)) #terrain
+colrs=seq(1,-1,-2/(dim(proto_demo_scaled)[2]-1))
+
+tmp = data.frame(proto_demo_scaled, getting_it_cca$U, getting_it_cca$V)
+names(tmp)[7:12] = c("meta_c.v.1","host_c.v.1","meta_c.v.2","host_c.v.2","meta_c.v.3","host_c.v.3")
+tmp = cor(tmp)
+for(i in 1:(dim(tmp)[1]))
+{
+for(j in 1:(dim(tmp)[2]))
+{
+	text(i,(dim(tmp)[2]+1)-j, round(tmp[i,j],2))
+}
+}
+
+tmp = data.frame(proto_demo_scaled, getting_it_cca$U, getting_it_cca$V)
+names(tmp)[7:12] = c("meta_c.v.1","meta_c.v.2","meta_c.v.3","host_c.v.1","host_c.v.2","host_c.v.3")
+#axis(1,1:10, c(names(scotts_Virulence_set), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+#axis(2,1:10, c(names(scotts_Virulence_set), names(scotts_Immunology_set)), las=2,cex.axis=.75)
+axis(1,1:dim(tmp)[2], c(c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"), names(tmp)[4:12]), las=2,cex.axis=.75)
+axis(2,1:dim(tmp)[2], c(c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence"), names(tmp)[4:12])[seq(dim(tmp)[2],1,-1)], las=2,cex.axis=.75)
+abline(6.5,0)
+#abline(5.5,0)
+#lines(c(3.5,3.5),c(-20,20) )
+lines(c(6.5,6.5),c(-20,20) )
+
+
+
+tmp = data.frame(proto_demo_scaled, getting_it_cca$U[,1:2], getting_it_cca$V[,1:2])
+names(tmp)[7:10] = c("meta_c.v.1","meta_c.v.2","host_c.v.1","host_c.v.2")
+tmp = cor(tmp)
+barplot(eigen(tmp)$values/sum(eigen(tmp)$values))
+
+cono_cor_svd = svd(tmp)
+
+tmp = data.frame(proto_demo_scaled, getting_it_cca$U[,1:2], getting_it_cca$V[,1:2])
+names(tmp)[7:10] = c("meta_c.v.1","meta_c.v.2","host_c.v.1","host_c.v.2")
+plot(rbind(c(0,0), cono_cor_svd$u[1,1:2]), xlim=c(-.6,.4), ylim=c(-.7,.5), type="l", xlab="", ylab="")
+text(cono_cor_svd$u[1,1], cono_cor_svd$u[1,2], labels="anti A-biotics+toxics",cex=.5)
+for(i in 2:dim(cono_cor_svd$u)[1])
+{
+	lines(rbind(c(0,0), cono_cor_svd$u[i,1:2])) 
+	text(cono_cor_svd$u[i,1], cono_cor_svd$u[i,2]+runif(1,min=-.05,max=.05), c(c("anti A-biotics+toxics","Type III/IV/ESAT","Virulence"), names(tmp)[4:10])[i], cex=.5)
+} 
+
+
+
+
+#step 3: demonstrate FA
+
+names(proto_demo_scaled)[1:3] = c("anti A-biotics + toxics","Type III/IV/ESAT","Virulence")
+factanal(proto_demo_scaled, 2, covmat=cor(proto_demo_scaled), n.obs=12)
+
+p_tmp = t(t(factanal(proto_demo_scaled, 2, covmat=cor(proto_demo_scaled), n.obs=12)$uniquenesses))
+colnames(p_tmp)="Uniquenesses"
+p_tmp
+
+
+#step 4: propose new methodology idea
+
+
+
+
+
+
+
+
+factanal(data.frame(scotts_Virulence_set, scotts_Immunology_set), 2, covmat=cor(data.frame(scotts_Virulence_set,  scotts_Immunology_set)), n.obs=12)
+
+factanal(data.frame(scotts_Virulence_set, scotts_Immunology_set), 2, covmat=cor(data.frame(scotts_Virulence_set,  scotts_Immunology_set)), n.obs=12)$loadings[1:10,]
+
+t(sqrt(factanal(data.frame(scotts_Virulence_set, scotts_Immunology_set), 2, covmat=cor(data.frame(scotts_Virulence_set,  scotts_Immunology_set)), n.obs=12)
+$uniquenesses))
+
+
+
+factanal(t(SEED2matrix[c(2,1,3,5,4),]),2,covmat=cor(t(SEED2matrix[c(2,1,3,5,4),])), n.obs=12)
+(SEEDlevel2[lookATthese])[c(2,1,3,5,4)]
+
+
+factanal(data.frame(scotts_Virulence_set, scotts_Immunology_set), 3, covmat=cor(data.frame(scotts_Virulence_set,  scotts_Immunology_set)), n.obs=12)
+
+
+
+# canonical correlation
+
+canocor(apply(scotts_Virulence_set,2,scale), apply(scotts_Immunology_set,2,scale))
+# this is the same here 
+fun = canocor(scotts_Virulence_set, scotts_Immunology_set)
+
+# so let's see what we've got here.. can i interpret this?
+#  names(fun)
+#  [1] "ccor"   "A"      "B"      "U"      "V"      "Fs"     "Gs"     
+#  [8] "Fp"     "Gp"     "fitRxy" "fitXs"  "fitXp"  "fitYs"  "fitYp"
+
+# look. here's how this is set up.
+# fun$A[,1] %*% t(apply(scotts_Virulence_set,2,scale)) = fun$U[,1]
+# they give you the a's and b's.. and then they even give you the transformed versions! nice. 
+
+# of course; then we have that
+# cor(fun$U[,1], fun$V[,1]) = fun$ccor[1,1]
+
+# so, that's the first 5 most important things.
+# we have the transformation matricies (A and B).  
+# these map the original data to the canonical components.. like principal components.. or..
+# actually, these are a lot like the factors and the loadings would map these back to the original variables
+
+# time to take a look at the biplot info that we've got here
+
+
+plot(fun$A[1,], fun$B[1,])
+points(fun$Fs[,1], fun$Gs[,1],col='red')
+
+
+plot(fun$Fs[,1], fun$Gs[,1])
+points(fun$Fp[,1], fun$Gp[,1],col='red')
+
+plot(fun$U[,1], fun$V[,1])
+
+points(fun$Fp[,1], fun$Gp[,1],col='red')
+
+
+
+ 
+plot(fun$Fs) 
+
+
+
+help(biplot)
+help(factanal)
+
+# 5 test outcomes 
+n_tests = 5
+l1=(1:n_tests)/n_tests
+l2=c(rnorm(n_tests))
+L = cbind( l1, l2) 
+L
+# L=varimax(L)
+
+
+# two scores (factors)
+n=1000
+f1=rnorm(n)
+f2=rnorm(n)
+F = rbind(f1,f2) # F
+
+# testx = L %*% F 
+testxe = L %*% F + matrix(rnorm(n*n_tests, 0,.5), nrow=n_tests, ncol=n)
+
+factanal(t(testxe),2, covmat=cor(t(testxe)), n.obs=n)
+
+# so, the distribution of y is normal(0, some variance depending on the l's and the noise variance 
+# for(i in 1:n_tests)
+#	hist(testxe[i,])
+#	hist(scale(testxe[i,]))
+
+# L = newL = factanal(t(testxe),2, covmat=cor(t(testxe)), n.obs=n)$loadings[1:5,]
+# uniquenesses = newU = factanal(t(testxe),2, covmat=cor(t(testxe)), n.obs=n)$uniquenesses
+# uniquenesses are variances of the factors unique to each test  
+
+
+
+n=1000
+f1=rnorm(n)
+f2=rnorm(n)
+F = rbind(f1,f2) # F
+
+
+
+# this is for when we're getting a recoverable solution
+testxe = L %*% F + rbind(rnorm(n, 0, sqrt(uniquenesses[1])),
+			 rnorm(n, 0, sqrt(uniquenesses[2])),
+			 rnorm(n, 0, sqrt(uniquenesses[3])),
+			 rnorm(n, 0, sqrt(uniquenesses[4])),
+			 rnorm(n, 0, sqrt(uniquenesses[5])))
+
+var(testxe[1,])
+	
+factanal(t(testxe),2, covmat=cor(t(testxe)), n.obs=n)
+L
+uniquenesses
+
+# awesome. well done young man. you've got basic factor analyis all set to go.
+# now, let's try to get our actual data fit. 
+# don't forget qr function.  .. someday i'll probably learn that matrix stuff 
+
+
+
+dim(XX) 
+### X[10x12]=U[10xL]D[LxR]V[12XR]'
+
+# this gives proportions
+my_1st_SVD = svd(XX,nu=10,nv=12)
+
+svd(SEED2matrix,nu=10,nv=12)
+SUBSET
+
+
+
+# request from iddo regarding
+# > 1) Ton_and_tol transport systems
+# > 2) Type_4_secretion_and_conjugative_transfer
+# > 3) Cobalt_zinc_cadmium_resistance
+# subcategories in the virulence.
+
+
+#library(DAAG)
+
+ton_n_tol = which(stacked_data$Subsystem.Hierarchy.2=="Virulence" & 
+stacked_data$Subsystem.Name=="Ton_and_Tol_transport_systems")
+# [1]  27 329 361  73 269 188  27  34   2 143  46  32
+ton_n_tol=stacked_data[ton_n_tol,5] 
+for(i in 1:12)
+{
+	ton_n_tol[i]=ton_n_tol[i]/sum(stacked_data[stacked_data$Subsystem.Hierarchy.2=="Virulence" & stacked_data$id==the_samples[i], 5])
+}
+twot.permutation(ton_n_tol[1:6],ton_n_tol[7:12])
+# 0.23
+
+
+Type_4_secretion_and_conjugative_transfer = which(stacked_data$Subsystem.Hierarchy.2=="Type III, Type IV, ESAT secretion systems" & stacked_data$Subsystem.Name=="Type_4_secretion_and_conjugative_transfer")
+# had some 0's to take care of 
+#the_samples
+#stacked_data$id[Type_4_secretion_and_conjugative_transfer]
+# 397  862 1318 #0 2243 2697  #0 #0 4027 4501 5004 5421
+# 89  40  50  #0 37 532      #0  #0 17   1  48 274
+Type_4_secretion_and_conjugative_transfer = stacked_data[Type_4_secretion_and_conjugative_transfer,5] 
+tmp = rep(0,12)
+tmp[c(1:3,5,6,9:12)]= Type_4_secretion_and_conjugative_transfer
+Type_4_secretion_and_conjugative_transfer=tmp
+
+for(i in 1:12)
+{
+	Type_4_secretion_and_conjugative_transfer[i]= Type_4_secretion_and_conjugative_transfer[i]/sum(stacked_data[stacked_data$Subsystem.Hierarchy.2=="Type III, Type IV, ESAT secretion systems" & stacked_data$id==the_samples[i], 5],na.rm=TRUE)
+}
+twot.permutation(Type_4_secretion_and_conjugative_transfer[1:6], Type_4_secretion_and_conjugative_transfer[7:12])
+
+
+Cobalt_zinc_cadmium_resistance = which(stacked_data$Subsystem.Hierarchy.2=="Resistance to antibiotics and toxic compounds" & 
+stacked_data$Subsystem.Name=="Cobalt-zinc-cadmium_resistance")
+Cobalt_zinc_cadmium_resistance
+# [1]  341  806 1262 1734 2188 2640 3116 3553 3972 4439 4940 5371
+Cobalt_zinc_cadmium_resistance = stacked_data[Cobalt_zinc_cadmium_resistance,5] 
+for(i in 1:12)
+{
+	Cobalt_zinc_cadmium_resistance[i]= Cobalt_zinc_cadmium_resistance[i]/sum(stacked_data[stacked_data$Subsystem.Hierarchy.2=="Resistance to antibiotics and toxic compounds" & stacked_data$id==the_samples[i], 5])
+}
+twot.permutation(ton_n_tol[1:6],ton_n_tol[7:12])
+t.test(ton_n_tol[1:6],ton_n_tol[7:12])
+# 0.215
+
+
+
+
+library(MCMCpack)
+chisq.test( rbind(rdirichlet(5,rep(1,6)/6),rdirichlet(5,1:6/sum(1:6))) )
+
+
+
+
+

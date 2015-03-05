@@ -1,0 +1,2295 @@
+
+
+options(max.print=1000)
+
+
+# Normalization is not decided yet. ..
+# I need to look at the background data. .. wonder how it looks across samples?
+# But I'm not doing that today.  Today is just setting up the two projects:
+# (1) Iddo: get two data sets ready: microarray & bacterial counts via sequencing/MG-Rast
+# (2) Damir: get two data sets ready: microarray & gene counts via sequencing
+
+#has normalization procedures
+library(preprocessCore)
+#plot.colorbar
+library(fields)
+
+
+# codelink fields:
+# Spot_noise_level = Bkgd_median + 1.5*Bkgd_stdev
+# Signal_strength = Spot_mean / Spot_noise_level# Quality_flag = Signal_strength > 1 
+# Raw_intensity = Spot_mean -- Bkgr_median
+
+# "M", "I", "C", will be treated as NA
+# So will "CI", "CS", "CL", "IS" 
+# And anything with a "P" (can't remember what it is) will also be NA
+# "S" will be treated as "high"
+# "L" will be treated as "low"
+# "S" and "L" could be one of two things: 
+# (1) malfunctions
+# (2) actual low/high measurements
+# We will assume (2) because we are trusting the measuring device anyway.
+
+
+
+#Damir data set: means, premies
+
+damir_sample_names=read.table("~/Desktop/ChapkinLab/Damir/filenames.csv", stringsAsFactors=FALSE,sep=',',comment.char="#", header=FALSE)$V1
+
+#scratch: this is how we load a data set.
+damir_eg=read.table("~/Desktop/ChapkinLab/Damir/Data_files_for_Chen/T00347860_baby_43_all.csv", 
+stringsAsFactors=FALSE,sep=',',comment.char="#",quote='"',
+skip=5,nrows=54359,header=TRUE)
+damir_eg=damir_eg[c(1:5,9,12,16,21,27,32)]
+
+
+# eeeee. .. there's a weird dependence between spot size and expression level.. .
+# let's just say the radius is calculated on the basis of intensity. ..
+# that's actually probably what happens anyway.. .
+plot(damir_eg$Spot_area[damir_eg$Probe_type!="DISCOVERY"], 
+damir_eg$Raw_intensity[damir_eg$Probe_type!="DISCOVERY"])
+
+#importing data: making the data set accessible
+damir_samples_RawVals = NULL 
+damir_samples_Bkgd = NULL 
+damir_samples_NormVals = NULL 
+#samples_probeTypes = samples #actually, redundant: these should are constant across...
+damir_samples_flags = NULL
+for(i in damir_sample_names)
+{
+	damir_sample = 
+	read.table(
+	paste("~/Desktop/ChapkinLab/Damir/Data_files_for_Chen/",i,sep=''), 
+stringsAsFactors=FALSE,sep=',',comment.char="#",quote='"',
+skip=5,nrows=54359,header=TRUE,fill=TRUE)
+	#sample
+	dim(damir_sample)
+
+#only 2:5 should vary between samples... the rest are fixed identifiers... let's hope 
+	damir_sample = damir_sample[,c(1:5,12,16,21,27,32,24,25,33,34,35)]
+	names(damir_sample)=c("ID_REF", "Raw_intensity", "VALUE", "Quality_flag", "Signal_strength", "Bkgd_mean", "Probe_name",  "Annotation_NCBI_Acc", "Probe_type","Annotation_Pub_Probe_Targets",
+"Annotation_OGS", "Annotation_UniGene", "Annotation_Molecular_Function", "Annotation_Biological_Process", "Annotation_Cellular_Component")
+#[1] "ID_REF"                       "Raw_intensity"               
+#[3] "Normalized_intensity"         "Quality_flag"                
+#[5] "Signal_strength"              "Probe_name"                  
+#[7] "Annotation_NCBI_Acc"          "Probe_type"                  
+#[9] "Annotation_Pub_Probe_Targets"
+
+	print(length(damir_sample$Raw_intensity))
+		
+	damir_samples_RawVals = cbind(damir_samples_RawVals, damir_sample$Raw_intensity) 
+	damir_samples_Bkgd = cbind(damir_samples_Bkgd, damir_sample$Bkgd_mean) 
+	damir_samples_NormVals = cbind(damir_samples_NormVals, damir_sample$VALUE) 
+	damir_samples_flags = cbind(damir_samples_flags, damir_sample$Quality_flag)
+
+	print(i)	
+	
+	print(sum(damir_eg$ID_REF==damir_sample$ID_REF))	
+	print(sum(damir_eg$Probe_name==damir_sample$Probe_name))	
+	print(sum(damir_eg$Annotation_NCBI_Acc==damir_sample$Annotation_NCBI_Acc))
+	print(sum(damir_eg$Probe_type==damir_sample$Probe_type))	
+	print(sum(damir_eg$Annotation_Pub_Probe_Targets==damir_sample$Annotation_Pub_Probe_Targets))
+}
+
+
+
+
+#Iddo data set: means term FF/BF
+
+
+#get the names of the samples...
+iddo_sample_names=read.table("~/Desktop/ChapkinLab/Iddo/Mead_Johnson/file_names.csv", stringsAsFactors=FALSE,sep=',',comment.char="#", header=TRUE)$filename
+
+#sorting samples by treatment groups
+iddo_sample_groupings=read.table("~/Desktop/ChapkinLab/Iddo/Mead_Johnson/file_names.csv", stringsAsFactors=FALSE,sep=',',comment.char="#", header=TRUE)$group
+
+sample_names_tmp = iddo_sample_names
+sample_names_tmp[1:sum(iddo_sample_groupings=="FF")] = iddo_sample_names[iddo_sample_groupings=="FF"]
+sample_names_tmp[(1+sum(iddo_sample_groupings=="FF")):sum(iddo_sample_groupings=="BF"|iddo_sample_groupings=="FF")] = iddo_sample_names[iddo_sample_groupings=="BF"]
+sample_names_tmp[(1+sum(iddo_sample_groupings=="BF"|iddo_sample_groupings=="FF")):sum(iddo_sample_groupings!="rep")] = iddo_sample_names[iddo_sample_groupings=="BMS"]
+sample_names_tmp[(1+sum(iddo_sample_groupings!="rep")):length(iddo_sample_names)] = iddo_sample_names[iddo_sample_groupings=="rep"]
+
+iddo_sample_names = sample_names_tmp
+
+
+#scratch: this is how we load a data set.
+iddo_eg=read.table("~/Desktop/ChapkinLab/Iddo/Mead_Johnson/Txt_files_of_all_pts/T00346112_FF4_2.TXT", stringsAsFactors=FALSE,sep='\t',comment.char="#",quote='"',
+skip=7,nrows=54359,header=TRUE)
+iddo_eg=iddo_eg[c(1:4,12,16,21,27,32)]
+
+names(iddo_eg)
+dim(iddo_eg)
+
+#scratch: this is the standard codelink normalization
+use4normalize = (iddo_eg$Quality_flag!='M') & (iddo_eg$Probe_type=='DISCOVERY')
+plot(iddo_eg$VALUE[use4normalize],iddo_eg$Raw_intensity[use4normalize]/medianiddo_eg$Raw_intensity[use4normalize]))
+abline(0,1)
+
+
+#importing data: making the data set accessible
+iddo_samples_RawVals = NULL 
+iddo_samples_Bkgd = NULL 
+iddo_samples_NormVals = NULL 
+#samples_probeTypes = samples #actually, redundant: these should are constant across...
+iddo_samples_flags = NULL
+for(i in iddo_sample_names)
+{
+	iddo_sample = 
+	read.table(
+	paste("~/Desktop/ChapkinLab/Iddo/Mead_Johnson/Txt_files_of_all_pts/",i,sep=''), 
+			stringsAsFactors=FALSE,sep='\t',comment.char="#",quote='"',
+skip=7,nrows=54359,header=TRUE,fill=TRUE)
+	#sample
+	dim(iddo_sample)
+
+#only 2:4 should vary between samples... the rest are fixed identifiers... let's hope 
+	iddo_sample = iddo_sample[,c(1:4,12,16,21,27,32,24,25,33,34,35)]
+	names(iddo_sample)=c("ID_REF", "Raw_intensity", "VALUE", "Quality_flag", "Bkgd_mean", "Probe_name",  "Annotation_NCBI_Acc", "Probe_type","Annotation_Pub_Probe_Targets",
+"Annotation_OGS", "Annotation_UniGene", "Annotation_Molecular_Function", "Annotation_Biological_Process", "Annotation_Cellular_Component")
+#[1] "ID_REF"                       "Raw_intensity"               
+#[3] "VALUE"                        "Quality_flag"                
+#[5] "Probe_name"                   "Annotation_NCBI_Acc"         
+#[7] "Probe_type"                   "Annotation_Pub_Probe_Targets"
+
+	print(length(iddo_sample$Raw_intensity))
+		
+	iddo_samples_RawVals = cbind(iddo_samples_RawVals, iddo_sample$Raw_intensity) 
+	iddo_samples_Bkgd = cbind(iddo_samples_Bkgd, iddo_sample$Bkgd_mean) 
+	iddo_samples_NormVals = cbind(iddo_samples_NormVals, iddo_sample$VALUE) 
+	iddo_samples_flags = cbind(iddo_samples_flags, iddo_sample$Quality_flag)
+
+	print(i)	
+	
+	print(sum(damir_eg$ID_REF==iddo_sample$ID_REF))	
+	print(sum(damir_eg$Probe_name==iddo_sample$Probe_name))	
+	print(sum(damir_eg$Annotation_NCBI_Acc==iddo_sample$Annotation_NCBI_Acc))
+	print(sum(damir_eg$Probe_type==iddo_sample$Probe_type))	
+	print(sum(damir_eg$Annotation_Pub_Probe_Targets==iddo_sample$Annotation_Pub_Probe_Targets))
+}
+
+
+
+# matching to Iddo's data set.
+# Note that we 5 have replicates. . .
+# all but 1 of these also appears in Iddo's sequencing data set. 
+
+iddo_phylum_percents$Chapkin_Id
+# [1] "FF15"  "FF13"  "FF7"   "FF5"   "FF3"   "FF2"   "BF6"   "BF4"   "BF3"  
+# [10] "BMS16" "BMS10" "BMS8" 
+# These are the samples that we've got in the bacterial data. .. matched up
+paired_microarray_samples = c(8, 6, 10, 3, 5, 4, 18, 13, 15, 20, 23, 21)
+names(samples_RawVals)[paired_microarray_samples]
+# [1] "T00346131_FF15_1.TXT"  "T00346128_FF13_1.TXT"  "T00346135_FF7_1.TXT"  
+# [4] "T00346118_FF5_1.TXT"   "T00346125_FF3_1.TXT"   "T00346121_FF2_1.TXT"  
+# [7] "T00346134_BF6_1.TXT"   "T00346119_BF4_1.TXT"   "T00346127_BF3_1.TXT"  
+#[10] "T00346117_BMS16_1.TXT" "T00346136_BMS10_1.TXT" "T00346122_BMS8_1.TXT" 
+
+
+
+# we're gonna combine the two data sets, like this:
+
+all_data_sample_groups=c(iddo_sample_names, damir_sample_names)
+all_data_sample_groups[1:10]="FF"
+all_data_sample_groups[11:18]="BF"
+all_data_sample_groups[19:23]="BMS"
+all_data_sample_groups[24:28]="rep"
+all_data_sample_groups[29:34]="premie"
+
+
+samples_probeTypes = iddo_sample$Probe_type #actually, redundant: these are constant across samples since all are on the same chip.
+samples_probeNames = iddo_sample$Probe_name #actually, redundant: these are constant across samples since all are on the same chip.
+samples_NCBIanno = iddo_sample$Annotation_NCBI_Acc #actually, redundant: these are constant across samples since all are on the same chip.
+samples_ProbeInfo = iddo_sample$Annotation_Pub_Probe_Targets #actually, redundant: these are constant across samples since all are on the same chip.
+samples_IDref = iddo_sample$ID_REF #actually, redundant: these are constant across samples since all are on the same chip.
+
+samples_Annotation_OGS = iddo_sample$Annotation_OGS
+samples_Annotation_UniGene = iddo_sample$Annotation_UniGene
+samples_GO_Molecular_func = iddo_sample$Annotation_Molecular_Function 
+samples_GO_biological_proc = iddo_sample$Annotation_Biological_Process
+samples_GO_cellular_comp = iddo_sample$Annotation_Cellular_Component
+
+
+samples_RawVals = data.frame(cbind(iddo_samples_RawVals,damir_samples_RawVals))
+samples_Bkgd = data.frame(cbind(iddo_samples_Bkgd,damir_samples_Bkgd))
+samples_NormVals = data.frame(cbind(iddo_samples_NormVals,damir_samples_NormVals))
+samples_flags = data.frame(cbind(iddo_samples_flags,damir_samples_flags))
+names(samples_RawVals)= c(iddo_sample_names,damir_sample_names)
+names(samples_NormVals)= c(iddo_sample_names,damir_sample_names)
+names(samples_flags)= c(iddo_sample_names,damir_sample_names)
+
+# we don't use anything but discovery, because all the controls
+# are something else with bacteria spike ins, etc.
+table(samples_probeTypes)
+# samples_probeTypes
+# DISCOVERY  FIDUCIAL  NEGATIVE  POSITIVE 
+#     53423       192       384       360 
+
+
+#okay, let's run some raw data description stuff:
+
+
+# Dealing with initial problems
+# M's are really NA's anyway.. .  let's just do that.
+# and there's the other designated NA's as well.. . so we do that too
+# and finally. .. negative values mean the expression level is below
+# the background. .. it just means its "low".. . So, negative values 
+# are all set to a min value greater than 0. ..
+# now.. . what are we going to do for normalization??
+# do we use L values?
+
+#Keep only discovery
+samples_RawVals = samples_RawVals[samples_probeTypes=="DISCOVERY",]
+samples_Bkgd = samples_Bkgd[samples_probeTypes=="DISCOVERY",]
+samples_flags = samples_flags[samples_probeTypes=="DISCOVERY",]
+
+samples_NCBIanno=samples_NCBIanno[samples_probeTypes=="DISCOVERY"]
+samples_IDref=samples_IDref[samples_probeTypes=="DISCOVERY"]
+samples_probeNames=samples_probeNames[samples_probeTypes=="DISCOVERY"]
+
+samples_Annotation_OGS = samples_Annotation_OGS[samples_probeTypes=="DISCOVERY"]
+samples_Annotation_UniGene = samples_Annotation_UniGene[samples_probeTypes=="DISCOVERY"]
+samples_GO_Molecular_func = samples_GO_Molecular_func[samples_probeTypes=="DISCOVERY"]
+samples_GO_biological_proc = samples_GO_biological_proc[samples_probeTypes=="DISCOVERY"]
+samples_GO_cellular_comp = samples_GO_cellular_comp[samples_probeTypes=="DISCOVERY"]
+
+samples_probeTypes = samples_probeTypes[samples_probeTypes=="DISCOVERY"]
+
+
+
+dim(samples_RawVals)
+# [1] 53423    34
+
+# NA all flags that aren't G/L/S
+samples_RawVals[samples_RawVals==-9999]=NA
+samples_RawVals[samples_flags!='L' & samples_flags!='G' & samples_flags!='S']=NA
+samples_Bkgd[samples_RawVals==-9999]=NA
+samples_Bkgd[samples_flags!='L' & samples_flags!='G' & samples_flags!='S']=NA
+
+
+
+# What to do with the ones below 0?
+
+# you have a choice here. .. (a) or (b)?
+if(1=="so what are you going to do here?")
+{
+#this one doesn't work because [samples_RawVals<=0] returns all the NA spots too!
+#samples_RawVals[samples_RawVals<=0] = min(samples_RawVals[samples_RawVals>0],na.rm=TRUE)
+
+# let's make sure those funny outliers aren't because of this crazy shift stuff.. .
+samples_RawVals[samples_RawVals<=0] = NA
+
+}
+
+# I like (c). .. second choice above. .. I don't think the low measurements 
+# are really a problem. .. for DE. .. we don't want low versus low comparisons. ..
+# perhaps. .. okay, i get that. .. but really, my drop to min positive does weird stuff
+#THIS IS WHAT WE'RE DOING
+tmp=c(as.matrix(samples_RawVals))
+smallest=min(tmp,na.rm=TRUE)
+tmp[which.min(c(as.matrix(samples_RawVals)))]=NA
+nextsmallest=min(tmp,na.rm=TRUE)
+samples_RawVals = samples_RawVals - smallest - (smallest - nextsmallest)
+
+
+#let's trash boring rows . . . these aren't even useful .. . come on.
+# REMEMBER.. THAT FIRST SAMPLE WAS REPEATED.. OOOPS
+# so, we're removing that here
+emptyA = 0==apply(!is.na(samples_RawVals[2:10]),1,sum)
+emptyB = 0==apply(!is.na(samples_RawVals[11:23]),1,sum)
+#are we wanting to also work with the premies? sure for now.
+#emptyC = 0==apply(!is.na(samples_RawVals[29:34]),1,sum)
+empty = emptyA | emptyB | emptyC
+
+samples_RawVals = samples_RawVals[!empty,]
+samples_Bkgd = samples_Bkgd[!empty,]
+samples_flags = samples_flags[!empty,]
+samples_NCBIanno=samples_NCBIanno[!empty]
+samples_IDref=samples_IDref[!empty]
+samples_probeTypes = samples_probeTypes[!empty]
+samples_probeNames=samples_probeNames[!empty]
+
+samples_Annotation_OGS = samples_Annotation_OGS[!empty]
+samples_Annotation_UniGene = samples_Annotation_UniGene[!empty]
+samples_GO_Molecular_func = samples_GO_Molecular_func[!empty]
+samples_GO_biological_proc = samples_GO_biological_proc[!empty]
+samples_GO_cellular_comp = samples_GO_cellular_comp[!empty]
+
+
+# NORMALIZATION IS DONE IN THE MA SECTION BELOW
+# NORMALIZATION IS DONE IN THE MA SECTION BELOW
+# NORMALIZATION IS DONE IN THE MA SECTION BELOW
+# NORMALIZATION IS DONE IN THE MA SECTION BELOW
+# NORMALIZATION IS DONE IN THE MA SECTION BELOW
+
+
+# Now, what I really wanna know is . . . are you gonna be my girl
+# Or, do the replicates look right?
+names(samples_RawVals[1:29]) 
+# [1] "T00346112_FF4_2.TXT"       "T00346116_FF11_1.TXT"     
+# [3] "T00346118_FF5_1.TXT"       "T00346121_FF2_1.TXT"      
+# [5] "T00346125_FF3_1.TXT"       "T00346128_FF13_1.TXT"     
+# [7] "T00346130_FF12_1.TXT"      "T00346131_FF15_1.TXT"     
+# [9] "T00346132_FF14_1.TXT"      "T00346135_FF7_1.TXT"      
+#[11] "T00346114_BF5_1.TXT"       "T00346115_BF1_1.TXT"      
+#[13] "T00346119_BF4_1.TXT"       "T00346120_BF8_1.TXT"      
+#[15] "T00346127_BF3_1.TXT"       "T00346129_BF10_1.TXT"     
+#[17] "T00346133_BF7_1.TXT"       "T00346134_BF6_1.TXT"      
+#[19] "T00346113_BMS2_1.TXT"      "T00346117_BMS16_1.TXT"    
+#[21] "T00346122_BMS8_1.TXT"      "T00346126_BMS3_1.TXT"     
+#[23] "T00346136_BMS10_1.TXT"     "2008_T00340956_BF3.TXT"   
+#[25] "2008_T00340957_BMS3.TXT"   "2008_T00340958_BMS8.TXT"  
+#[27] "2008_T00340959_FF3.TXT"    "2008_T00340963_FF5.TXT"   
+
+
+# checking things with replicates
+
+replicates = matrix(0,2,5)
+replicates[2,] = c(24,26:28,25)
+replicates[1,] = c(15,21,5,3,22)
+
+# does it always look like this?
+scramble=  c(26:28,25,24) 
+replicates[2,] = scramble
+
+iddo_sample_names[replicates[1,]]
+#[1] "T00346127_BF3_1.TXT"  "T00346122_BMS8_1.TXT" "T00346125_FF3_1.TXT" 
+#[4] "T00346118_FF5_1.TXT"  "T00346126_BMS3_1.TXT"
+iddo_sample_names[replicates[2,]]
+#[1] "2008_T00340956_BF3.TXT"  "2008_T00340958_BMS8.TXT" "2008_T00340959_FF3.TXT" 
+#[4] "2008_T00340963_FF5.TXT"  "2008_T00340957_BMS3.TXT"
+
+par(mar=c(4,4,3,2))
+par(mfrow=c(2,5)) 
+for(i in c(1,2,5,3,4))
+{
+	plot(log(samples_RawVals[,replicates[2,i]]+25,2),log(samples_RawVals[,replicates[1,i]]+25,2),
+	xlab=iddo_sample_names[replicates[2,i]],ylab=iddo_sample_names[replicates[1,i]])
+abline(0,1)
+}
+
+for(i in c(1,2,5,3,4))
+{
+Ys=log(samples_RawVals[,replicates[1,i]]+25,2)
+Xs=log(samples_RawVals[,replicates[2,i]]+25,2)
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),1/3)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),1/3)
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),	xlab=iddo_sample_names[replicates[2,i]],ylab=iddo_sample_names[replicates[1,i]])
+
+abline(0,1)
+
+tmp=(hist3d)
+tmp[tmp==0]=NA
+
+colorbar.plot(mean(Xseq),max(Yseq),1:20,col=terrain.colors(20),horizontal=TRUE,strip.width=.1)
+for(i in seq(1,length(Xseq),4))
+{
+	text(Xseq[i],max(Yseq)-1,paste(floor(quantile(tmp,i/length(Xseq),na.rm=TRUE))),col="black",cex=1)
+}
+
+}
+# yes they do.. . wow.
+# oh wait.. . let's look at two that shouldn't match:
+# . . . that's awesome: so ba-dass
+scramble="this is defined above)
+
+
+
+# Counts error flags 
+tmp=samples_RawVals[,all_data_sample_groups=="premie"]
+t(t(as.numeric(apply(is.na(tmp),2,sum))))
+signif(t(t(as.numeric(apply(is.na(tmp),2,sum)/53423))),2)
+tmp=samples_RawVals[,all_data_sample_groups=="FF"]
+t(t(as.numeric(apply(is.na(tmp),2,sum))))
+signif(t(t(as.numeric(apply(is.na(tmp),2,sum)/53423))),2)
+tmp=samples_RawVals[,all_data_sample_groups=="BF" | all_data_sample_groups=="BMS"]
+t(t(as.numeric(apply(is.na(tmp),2,sum))))
+signif(t(t(as.numeric(apply(is.na(tmp),2,sum)/53423))),2)
+tmp=samples_RawVals[,all_data_sample_groups=="rep"]
+t(t(as.numeric(apply(is.na(tmp),2,sum))))
+signif(t(t(as.numeric(apply(is.na(tmp),2,sum)/53423))),2)
+
+
+
+# Counts "Low" flags distributions of "low" flags/gene over various data subsets
+# not doing this for the replicates.. . i did put them in the graph 
+
+par(mfrow=c(2,3))
+tmp=samples_flags
+hist(apply(tmp=='L',1,sum),breaks=0:34,xlim=c(0,34),
+main="'Low' flags/gene: all data",ylim=c(0,30000),
+xlab="Number of 'Low' flags")
+
+tmp=samples_flags[,all_data_sample_groups=="FF"]
+hist(apply(tmp=='L',1,sum),breaks=0:10,ylim=c(0,30000),xlim=c(0,29),
+main="'Low' flags/gene: FF",
+xlab="Number of 'Low' flags")
+
+tmp=samples_flags[,all_data_sample_groups=="BF" | all_data_sample_groups=="BMS"]
+hist(apply(tmp=='L',1,sum),breaks=0:13,ylim=c(0,30000),xlim=c(0,34),
+main="'Low' flags/gene: BF",
+xlab="Number of 'Low' flags")
+
+tmp=samples_flags[,paired_microarray_samples[1:6]]
+hist(apply(tmp=='L',1,sum), breaks=0:6,ylim=c(0,30000),xlim=c(0,34),
+main="'Low' flags/gene: FF*",
+xlab="Number of 'Low' flags")
+
+tmp=samples_flags[,paired_microarray_samples[7:12]]
+hist(apply(tmp=='L',1,sum),breaks=0:6,ylim=c(0,30000),xlim=c(0,34),
+main="'Low' flags/gene: BF*",
+xlab="Number of 'Low' flags")
+
+tmp=samples_flags[,all_data_sample_groups=="premie"]
+hist(apply(tmp=='L',1,sum),breaks=0:6,ylim=c(0,30000),xlim=c(0,34),
+main="'Low' flags/gene: Premie",
+xlab="Number of 'Low' flags")
+
+
+
+# Low flag counts per sample 
+write.table(
+data.frame((
+paste(t(t(as.numeric(apply(samples_flags=="L",2,sum)))), " (",100*signif(t(t(as.numeric(apply(samples_flags=="L",2,sum))))/53423,3),"%)",sep=""))),
+"~/Desktop/ChapkinLab/Iddo/tmp.csv",sep=",")
+
+# and a plot of Low flags/sample 
+par(mfrow=c(1,1))
+plot(rep(1,10),as.numeric(apply(samples_flags=="L",2,sum))[1:10],xlim=c(1,4),ylim=range(as.numeric(apply(samples_flags=="L",2,sum))),
+axes=FALSE,xlab="",main="'Low' flags/sample",ylab="")
+axis(2)
+axis(1,1:4,c("FF","Reps","BF","Pre"))
+points(rep(1.1,6),as.numeric(apply(samples_flags=="L",2,sum))[paired_microarray_samples[1:6]],pch="*")
+
+points(rep(2,5),as.numeric(apply(samples_flags=="L",2,sum))[24:28])
+lines(c(2,3), c(as.numeric(apply(samples_flags=="L",2,sum))[24],as.numeric(apply(samples_flags=="L",2,sum))[13]))
+lines(c(2,3), c(as.numeric(apply(samples_flags=="L",2,sum))[25],as.numeric(apply(samples_flags=="L",2,sum))[22]))
+lines(c(2,3), c(as.numeric(apply(samples_flags=="L",2,sum))[26],as.numeric(apply(samples_flags=="L",2,sum))[21]))
+lines(c(2,1), c(as.numeric(apply(samples_flags=="L",2,sum))[27],as.numeric(apply(samples_flags=="L",2,sum))[5]))
+lines(c(2,1), c(as.numeric(apply(samples_flags=="L",2,sum))[28],as.numeric(apply(samples_flags=="L",2,sum))[3]))
+
+points(rep(3.1,6),as.numeric(apply(samples_flags=="L",2,sum))[paired_microarray_samples[7:12]],pch="*")
+points(rep(3,13),as.numeric(apply(samples_flags=="L",2,sum))[11:23])
+points(rep(4,6),as.numeric(apply(samples_flags=="L",2,sum))[24:29])
+
+
+
+
+# raw values --- all values 
+
+par(mfrow=c(1,1))
+par(mar=c(12,4,4,1))
+tmp=log(samples_RawVals,2)
+boxplot(tmp,axes=FALSE,main="log2 Raw Intensities")
+axis(2)
+axis(1,1:34,names(samples_RawVals),las=2,cex.axis=.75)
+tmp[,-paired_microarray_samples]=NA
+boxplot(tmp,add=TRUE,col='green',axes="FALSE")
+abline(5,0,col='red',lwd=2)
+breaks=c(10.5,18.5,23.5,28.5)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+# raw values --- no L flags
+tmp = log(samples_RawVals,2)
+tmp[samples_flags=="L"]=NA
+par(mar=c(12,4,4,1))
+boxplot(tmp,axes=FALSE,main="log2 Raw Intensities -- No L flags",
+ylim=c(-10,15))
+axis(2)
+axis(1,1:34,names(samples_RawVals),las=2,cex.axis=.75)
+tmp[,-paired_microarray_samples]=NA
+boxplot(tmp,add=TRUE,col='green',axes="FALSE")
+abline(6.3,0,col='red',lwd=2)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+
+# looking at background values
+# We won't use the bad ones.. . just like the others
+
+
+par(mar=c(12,4,4,1))
+boxplot(samples_Bkgd,axes=FALSE,main="Bkgd mean Intensities")
+tmp=samples_Bkgd
+tmp[,-paired_microarray_samples]=NA
+boxplot(tmp,add=TRUE,col='green',axes="FALSE")
+abline(55,0,col='red',lwd=2)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+axis(2)
+axis(1,1:34,names(samples_RawVals),las=2,cex.axis=.75)
+
+
+
+# residual plots
+
+# plots making the data look bad
+# WOOPS! screwed the data up by not using right steps!!
+# Things aren't so bad now.. . 
+
+tmp=samples_RawVals
+# take a look at less data. . . removing low flags
+tmp=samples_RawVals[
+apply(samples_flags[,1:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,]
+
+
+group=1:10
+group=11:23
+
+total=dim(tmp)[1]
+window = total
+
+xbars=apply(log(tmp[1:total,group],2),1,mean,na.rm=TRUE)
+summary(xbars)
+
+tmp=as.matrix(log(tmp[1:total,group],2))-xbars
+
+# we aren't removing outliers
+#tmp=tmp[apply(outliers[,group],1,sum,na.rm=TRUE)==0,]
+#xbars=xbars[apply(outliers[,group],1,sum,na.rm=TRUE)==0]
+#total=length(xbars)
+#window = total
+
+xs=matrix(rep(xbars,length(group)),nrow=total,ncol=length(group),byrow=FALSE)
+tmp_x = xs[1:window,]
+tmp_y = tmp[1:window,]
+#plot(c(as.numeric(tmp_x)),c(as.numeric(tmp_y)),xlab="sample average",ylab="sample - sample mean", col='black', main="FF examples")
+#main="BF examples")
+#main="Premie examples")
+
+
+
+par(mar=c(4,4,2,1))
+par(mfrow=c(4,6))
+for(i in 1:length(group))
+{
+colr='black'
+if(sum(group[i]==paired_microarray_samples)==1)	
+	colr='blue'
+
+
+plot(c(as.numeric(tmp_x)),c(as.numeric(tmp_y)),xlab="sample average",ylab="sample - sample mean",main=names(samples_RawVals)[group[i]],col.main=colr)
+points(tmp_x[,i],tmp_y[,i], col=rainbow(length(group))[i])
+
+DF=data.frame("Xs"=tmp_x[,i],"Ys"=tmp_y[,i])
+DF=na.omit(DF)
+
+#my_2nd = lowess(DF$Xs,DF$Ys,f=.0075)
+my_1st = loess(DF$Ys~DF$Xs, span=.05,surface="interpolate", statistics="approximate",trace.hat="approximate")
+points(my_1st$x,my_1st$fitted,col='white',pch='.',cex=2.5)
+
+
+#points(my_1st,col='white',pch='.',cex=2.5)
+abline(0,0)
+
+
+if(group[1]==1 & i==5)
+	plot(1,1,axes=FALSE)
+}
+
+
+
+par(mar=c(4,4,2,1))
+par(mfrow=c(4,6))
+for(i in 1:length(group))
+{
+colr='black'
+if(sum(group[i]==paired_microarray_samples)==1)	
+	colr='blue'
+
+
+tmp=samples_RawVals
+tmp1=tmp[,group]
+Xs=as.matrix(log(tmp1,2))
+Xs=apply(Xs,1,mean,na.rm=TRUE)
+Ys=as.numeric(log(tmp1[,i],2))-Xs
+
+
+
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),.25)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),.25)
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+hist3d[hist3d==0]=NA
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),,xlab="sample average",ylab="sample - sample mean",main=names(samples_RawVals)[group[i]],col.main=colr)
+abline(0,0)
+
+if(group[1]==1 & i==5)
+	plot(1,1,axes=FALSE)
+
+}
+
+
+
+
+
+
+# DOING THE MA PLOT STYLE THING 
+# THIS IS OUR NORMALIZATION
+
+par(mfrow=c(1,2))
+
+tmp=samples_RawVals[,2:23]
+# take a look at less data. . . removing low flags
+tmp=samples_RawVals[
+apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,2:23]
+
+# now we're going to add in the premies. . . wonder what we're going to need to do with them. 
+if(1==0)
+{
+tmp=samples_RawVals[
+apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6 | 
+apply(samples_flags[,29:34]=='L',1,sum,na.rm=TRUE)<4, c(2:23,29:34) ]
+
+tmp1=tmp[,1:9]
+Xs=as.matrix(log(tmp1,2))
+tmp2=tmp[,10:22]
+Ys=as.matrix(log(tmp2,2))
+tmp3=tmp[,23:28]
+Zs=as.matrix(log(tmp3,2)) 
+
+Xs=apply(Xs,1,mean,na.rm=TRUE)
+Ys=apply(Ys,1,mean,na.rm=TRUE)
+Zs=apply(Zs,1,mean,na.rm=TRUE)
+
+# FF versus premie w/ premie on top
+As=(Xs+Zs)/2
+Bs=Zs-Xs 
+plot(As,Bs)
+
+# BF versus premie w/ premie on top
+As=(Ys+Zs)/2
+Bs=Zs-Ys 
+plot(As,Bs)
+
+#let's compare to the loessed version 
+Ds=samples_Loessed[,1:22]
+Ds=apply(Ds,1,mean,na.rm=TRUE)
+
+As=(Ds+Zs)/2
+Bs=Zs-Ds 
+
+par(mar=c(5,4,3,2))
+par(mfrow=c(1,2))
+plot(As,Bs)
+
+Xseq=seq(floor(range(As,na.rm=TRUE)[1]),ceiling(range(As,na.rm=TRUE)[2]),.2)
+Yseq=seq(floor(range(Bs,na.rm=TRUE)[1]),ceiling(range(Bs,na.rm=TRUE)[2]),.2)
+Xseq= Xseq[1:length(Xseq)] # for ma plot
+Yseq= Yseq[1:length(Yseq)] # for ma plot
+
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Bs>=Yseq[yy] & Bs<Yseq[yy+1] & As>=Xseq[xx] & As<Xseq[xx+1],na.rm=TRUE)
+}
+hist3d[hist3d==0]=NA
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),
+#xlab="(BF+FF)/2 gene averages",ylab="BF-FF", main="MA plot (log 2 data) w/ Loess adjustment")
+#xlab="(premie+FF)/2 gene averages",ylab="premie-FF", main="MA plot (log 2 data) w/ Loess adjustment")
+#xlab="(premie+BF)/2 gene averages",ylab="premie-BF", main="MA plot (log 2 data) w/ Loess adjustment")
+xlab="(premie+normBFnFF)/2 gene averages",ylab="premie-normBFnFF", main="MA plot (log 2 data) w/ Loess adjustment")
+
+
+#xlab="FF gene averages",ylab="BF gene averages", main="log2 average")
+#ylim=c(-1,2),xlim=c(5,12))
+abline(0,0)
+
+DF=data.frame(As,Bs)
+DF=na.omit(DF)
+#my_2nd = lowess(DF$As,DF$Bs,f=.0075)
+my_1st = loess(DF$Bs~DF$As, span=.25,surface="interpolate", statistics="approximate",trace.hat="approximate")#,method="symmetric")
+points(my_1st$x,my_1st$fitted,col='blue',pch='.',cex=2.5)
+
+
+
+# here, we could do the lowess normalization.. just add it from below.
+# would not be a problem 
+
+} 
+
+
+
+
+#This is because we've got a duplicated sample.
+tmp1=tmp[,1:9]
+Xs=as.matrix(log(tmp1,2))
+tmp2=tmp[,10:22]
+Ys=as.matrix(log(tmp2,2))
+Xs=apply(Xs,1,mean,na.rm=TRUE)
+Ys=apply(Ys,1,mean,na.rm=TRUE)
+
+samples_Loessed=log(tmp,2)
+
+
+for(jj in 1:7)
+{
+#MA plot instead of x vs y plot
+Xs = (Xs+Ys)/2
+Ys = Ys-Xs # BF minus FF
+
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),.05)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),.05)
+#Xseq= Xseq[1:141] # for ma plot
+#Yseq= Yseq[21:length(Yseq)] # for ma plot
+
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+
+hist3d[hist3d==0]=NA
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),
+xlab="(BF+FF)/2",ylab="BF-FF", main="MA plot, adjusted data")# w/ Loess adjustment")
+#xlab="FF gene averages",ylab="BF gene averages", main="log2 average")
+#ylim=c(-1,2),xlim=c(5,12))
+abline(0,1,lwd=2)
+abline(0,0)
+
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+#my_2nd = lowess(DF$Xs,DF$Ys,f=.0075)
+my_1st = loess(DF$Ys~DF$Xs, span=.25,surface="interpolate", statistics="approximate",trace.hat="approximate")#,method="symmetric")
+points(my_1st$x,my_1st$fitted,col='blue',pch='.',cex=2.5)
+
+
+colorbar.plot(mean(Xseq),max(Yseq),1:13,col=terrain.colors(20),horizontal=TRUE,strip.width=.27)
+for(i in 6+round(seq(1,length(Xseq),length(Xseq)/13)))
+{
+	text(1*(Xseq[i]-mean(Xseq))+mean(Xseq),max(Yseq)-.25,paste(floor(quantile(hist3d,i/length(Xseq),na.rm=TRUE))),col="black",cex=1)
+}
+
+text(10,5,"Less than a majority of 'Low' flags in FF or BB")
+text(7.7,-.8,"Less than a majority of 'Low' flags in FF or BB")
+
+# okay, homemade loess normalization coming up.
+# here we go. . . ;)
+# you have to redo this a few times by hand. . .
+# it is an iterative thing: 6 times did the trick for me.
+
+samples_Loessed[,1:9]=samples_Loessed[,1:9]+(my_1st$fitted)/2
+samples_Loessed[,10:22]=samples_Loessed[,10:22]-(my_1st$fitted)/2
+
+Xs= samples_Loessed[,1:9]
+Ys= samples_Loessed[,10:22]
+Xs=apply(Xs,1,mean,na.rm=TRUE)
+Ys=apply(Ys,1,mean,na.rm=TRUE)
+}
+
+#personal shift 
+samples_Loessed[,1:9]=samples_Loessed[,1:9]+(-.15)/2
+samples_Loessed[,10:22]=samples_Loessed[,10:22]-(-.15)/2
+
+dim(samples_Loessed)
+# [1] 16767    22
+# we get a different answer than this above number. . probably because 
+# we're removed the rows of nothingness 
+# we get [1] 16723    22
+# looks like it was because of using the premies, or not.
+
+# So these are the data we're going to work with. . . 
+# We'll start here tomorrow ;)
+
+# here we are at the moment.. 
+# what do I want to do to normalize? 
+# I.E. -- which samples should be used in normalization?
+# ANSWER: all, obviously.. just think about it.
+# We're going to do the loess normalization. 
+# or, that was just done above.
+# This is what we got:
+
+par(mfrow=c(1,2))
+par(mar=c(12,4,4,1))
+tmp=log(samples_RawVals[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6, paired_microarray_samples],2)
+boxplot(tmp,axes=FALSE,main="log2 Raw Intensities")
+axis(2)
+axis(1,1:length(paired_microarray_samples),names(samples_RawVals)[paired_microarray_samples],las=2,cex.axis=.75)
+tmp[,-paired_microarray_samples]=NA
+#boxplot(tmp,add=TRUE,col='green',axes="FALSE")
+abline(6,0,col='red',lwd=2)
+abline(8,0,col='red',lwd=2)
+breaks=c(6.5)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+tmp=samples_Loessed[,paired_microarray_samples-1]
+boxplot(tmp,axes=FALSE,main="Loessed log2 normalized Intensities")
+axis(2)
+axis(1,1:12,names(samples_Loessed)[paired_microarray_samples-1],las=2,cex.axis=.75)
+tmp[,-paired_microarray_samples]=NA
+#boxplot(tmp,add=TRUE,col='green',axes="FALSE")
+abline(6,0,col='red',lwd=2)
+abline(8,0,col='red',lwd=2)
+breaks=c(6.5)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+
+
+
+
+
+# Do I want to take a look at correlations between things? 
+# no . . . gotta move on. 
+paired_microarray_samples
+cor(samples_RawVals,use="pairwise.complete.obs")
+
+
+
+
+
+
+#so, I'm all set up to this point.
+#I've got my preferred normalized data.
+
+
+# IDDO data set: means metagenome phylum
+
+iddo_phylum_counts=read.table("~/Desktop/ChapkinLab/Iddo/sequencing_phylum_data.csv", stringsAsFactors=FALSE,skip=3,nrows=12,sep=',',comment.char="#", header=TRUE)
+
+names(iddo_phylum_counts)
+# [1] "Chapkin_Id"        "MG_Rast_Id"        "Group"            
+# [4] "Firmicutes"        "Actinobacteria"    "Proteobacteria"   
+# [7] "Bacteroidetes"     "Verrucomicrobia"   "Un_sub_classified"
+# [10] "Classified"        "Unclassified"     
+
+# this was just a qc check.. . make sure we've actually got the right stuff.
+iddo_phylum_FF_count_sum = apply(iddo_phylum_counts[iddo_phylum_counts$Group=='FF', 4:8],2,sum,na.rm=TRUE)
+iddo_phylum_BF_count_sum = apply(iddo_phylum_counts[iddo_phylum_counts$Group=='BF', 4:8],2,sum,na.rm=TRUE)
+
+iddo_phylum_percents = iddo_phylum_counts[, 1:9]
+iddo_phylum_percents[,4:9] = iddo_phylum_counts[,4:9]/apply(iddo_phylum_counts[,4:9],1,sum,na.rm=TRUE)  
+
+# signature plots
+par(mfrow=c(1,1))
+par(mar=c(9,4,3,1))
+plot(1:6,iddo_phylum_percents[1,4:9],type="l",ylim=c(0,.8),axes=FALSE,xlab="",col="blue",
+ylab="percent",lwd=2)
+box()
+axis(2)
+axis(1,1:6,names(iddo_phylum_percents)[4:9],las=2)
+legend("topright",legend=c("FF","BF","BF unique"),fill=c("blue","green","green"),border=c("blue","green","red"))
+for(i in 2:12)
+{
+	if(i==7)
+	lines(1:6,iddo_phylum_percents[i,4:9],col="red",lwd=4)
+	if(i==10)
+	lines(1:6,iddo_phylum_percents[i,4:9],col="red",lwd=4)
+	if(i==11)
+	lines(1:6,iddo_phylum_percents[i,4:9],col="red",lwd=4)
+	lines(1:6,iddo_phylum_percents[i,4:9],col="blue",lwd=2)
+	if(i>6)
+	lines(1:6,iddo_phylum_percents[i,4:9],col="green",lwd=2)
+}
+ 
+
+par(mfrow=c(2,1))
+par(mar=c(4,4,2,2))
+
+boxplot(iddo_phylum_percents$Firmicutes[1:6],at=1.25,xlim=c(1,10),ylim=c(0,.9),col="blue",
+ylab="Proportion")
+boxplot(iddo_phylum_percents$Firmicutes[7:12],at=1.75,xlim=c(1,10),add=TRUE,col="green")
+boxplot(iddo_phylum_percents$Actinobacteria[1:6],at=3.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue")
+boxplot(iddo_phylum_percents$Actinobacteria[7:12],at=3.75,xlim=c(1,10),add=TRUE,col="green")
+boxplot(iddo_phylum_percents$Proteobacteria[1:6],at=5.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue")
+boxplot(iddo_phylum_percents$Proteobacteria[7:12],at=5.75,xlim=c(1,10),add=TRUE,col="green")
+boxplot(iddo_phylum_percents$Bacteroidetes[1:6],at=7.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue")
+boxplot(iddo_phylum_percents$Bacteroidetes[7:12],at=7.75,xlim=c(1,10),add=TRUE,col="green")
+boxplot(iddo_phylum_percents$Verrucomicrobia[1:6],at=9.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue")
+boxplot(iddo_phylum_percents$Verrucomicrobia[7:12],at=9.75,xlim=c(1,10),add=TRUE,col="green")
+axis(1,seq(1.5,9.5,2),names(iddo_phylum_percents)[4:8],las=1,cex.axis=.5)
+legend("topright",legend=c("FF","BF"),fill=c("blue","green"),border=c("black","black"))
+title("Phylogenetic Distribution")
+
+FF_stat = iddo_phylum_percents[1:6,4:9]
+BF_stat = iddo_phylum_percents[7:12,4:9]
+FF_stat=FF_stat*log(FF_stat)
+BF_stat=BF_stat*log(BF_stat)
+
+observed_test_stat_FF = mean(apply(FF_stat,1,sum,na.rm=TRUE)) 
+observed_test_stat_BF = mean(apply(BF_stat,1,sum,na.rm=TRUE))
+
+plot(sort(-apply(FF_stat,1,sum,na.rm=TRUE)),type="p",col="blue",ylim=c(.5,1.6), 
+axes=FALSE, 
+main="Shannon index of diversity", ylab="Diversity score H",pch=16,
+xlab="BF and FF samples sorted by H")
+points(sort(-apply(BF_stat,1,sum,na.rm=TRUE)),col="green",pch=16)
+axis(1,1:6,rep("",6))
+axis(2)
+legend("topleft",legend=c("FF","BF"),fill=c("blue","green"),border=c("blue","green"))
+
+
+
+library(lawstat)
+levene.test(c(-apply(FF_stat,1,sum,na.rm=TRUE), -apply(BF_stat,1,sum,na.rm=TRUE)),c(rep(0,6),rep(1,6)),location="trim.mean") 
+
+
+plot(density(-apply(FF_stat,1,sum,na.rm=TRUE)))
+lines(density(-apply(BF_stat,1,sum,na.rm=TRUE)))
+
+
+
+#do permutation test of biodiversity.. using shannon index
+# never got around to doing this.. just went with ks test.. and didn't find anything.
+n_perm=100000-1
+phylum_tests = 1:n_perm
+iddo_phylum_percents
+for(i in 1:n_perm)
+{
+	shuff = sample(1:12,12)
+	FF_stat = iddo_phylum_percents[shuff[1:6],4:9]
+	BF_stat = iddo_phylum_percents[shuff[7:12],4:9]
+
+	phylum_tests[i] = sum(abs(apply(FF_stat, 2, mean) - apply(BF_stat, 2, mean)))
+}
+FF_stat = iddo_phylum_percents[1:6,4:9]
+BF_stat = iddo_phylum_percents[7:12,4:9]
+sum(abs(apply(FF_stat, 2, mean) - apply(BF_stat, 2, mean)))
+
+sum(1+(phylum_tests >= sum(abs(apply(FF_stat, 2, mean) - apply(BF_stat, 2, mean)))))/(n_perm+1)
+
+
+
+lines(density(-apply(BF_stat,1,sum,na.rm=TRUE)))
+
+
+plot(ecdf(-apply(FF_stat,1,sum,na.rm=TRUE)),xlim=c(.4,1.6))
+lines(ecdf(-apply(BF_stat,1,sum,na.rm=TRUE)),col='red')
+
+plot(cdf(-apply(FF_stat,1,sum,na.rm=TRUE)))
+
+
+ks.test(-apply(FF_stat,1,sum,na.rm=TRUE), -apply(BF_stat,1,sum,na.rm=TRUE))
+t.test(-apply(FF_stat,1,sum,na.rm=TRUE), -apply(BF_stat,1,sum,na.rm=TRUE))
+wilcox.test(-apply(FF_stat,1,sum,na.rm=TRUE), -apply(BF_stat,1,sum,na.rm=TRUE))
+
+
+ks.test(1:6,7:12)
+ks.test(1:6,4:9)
+t.test(1:6,4:9)
+
+plot(ecdf(1:6),xlim=c(0,10))
+lines(ecdf(4:9),col='red')
+
+
+
+# There's not a relationship really between 
+# the number of reads and the number of mappings.. uh.. that's not good.
+# means, the increased depth is not translating into more mappings..
+# means, it's just picking up more variability in reads.
+# or, new reads are just whatever.  
+
+total_read_num = 
+c(
+93677,294466,123705,199013,207765,239566,123124,146350,253407,196856,258644,
+151811)
+# in this order
+the_samples
+
+apply(iddo_phylum_counts[,4:9],1,sum)
+# in this order
+iddo_phylum_counts$Chapkin_Id
+plot(total_read_num, apply(iddo_phylum_counts[,4:9],1,sum)[c(12,11,10,9,8,7,6,5,3,2,1,4)])
+
+# this is from the Metabolic_script_analysis.txt file
+apply(data_counts,2,sum)
+# in this order
+the_samples
+plot(total_read_num, apply(data_counts,2,sum))
+
+
+
+
+
+
+# pie chart plot
+par(mar=c(1,1,2,1))
+par(mfrow=c(2,6))
+for(i in 1:12)
+{
+	#if(i!=4)
+	{
+		pie(as.numeric(iddo_phylum_percents[i,4:9]), col=terrain.colors(6),
+			labels=NULL)
+		title(iddo_phylum_percents$Chapkin_Id[i]) 
+#		legend('bottom',names(iddo_phylum_percents[i,4:9]),pch=c("1","2","3","4","5","6"),border=terrain.colors(6),fill=terrain.colors(6))
+	}
+	if(i==12)
+		legend('bottom',names(iddo_phylum_percents[i,4:9]),pch=c("1","2","3","4","5","6"),border=terrain.colors(6),fill=terrain.colors(6))
+
+}
+
+
+# support space plot
+par(mfrow=c(1,1))
+plot(iddo_phylum_percents[,4],iddo_phylum_percents[,5],xlab="Firmacutes",
+ylab="Actinobacteria",pch=21,col='blue',bg='blue')
+points(iddo_phylum_percents[7:12,4],iddo_phylum_percents[7:12,5],pch=21,bg='green',col='green')
+points(iddo_phylum_percents[c(7,10,11),4],iddo_phylum_percents[c(7,10,11),5],pch=21,bg='green',col='red')
+legend("topright",legend=c("FF","BF","BF unique"),fill=c("blue","green","green"),border=c("blue","green","red"))
+
+
+
+# individual signatures
+par(mfrow=c(2,6))
+for(i in 5:12)
+{
+	plot(1:6,iddo_phylum_percents[i,4:9],col="blue",type='l',
+	main=paste(iddo_phylum_counts$Chapkin_Id[i]))
+}
+
+
+
+# matching to Iddo's data set.
+# Note that we 5 have replicates. . .
+# all but 1 of these also appears in Iddo's sequencing data set. 
+
+iddo_phylum_percents$Chapkin_Id
+# [1] "FF15"  "FF13"  "FF7"   "FF5"   "FF3"   "FF2"   "BF6"   "BF4"   "BF3"  
+# [10] "BMS16" "BMS10" "BMS8" 
+# These are the samples that we've got in the bacterial data. .. matched up
+paired_microarray_samples = c(8, 6, 10, 3, 5, 4, 18, 13, 15, 20, 23, 21)
+names(samples_RawVals)[paired_microarray_samples]
+# [1] "T00346131_FF15_1.TXT"  "T00346128_FF13_1.TXT"  "T00346135_FF7_1.TXT"  
+# [4] "T00346118_FF5_1.TXT"   "T00346125_FF3_1.TXT"   "T00346121_FF2_1.TXT"  
+# [7] "T00346134_BF6_1.TXT"   "T00346119_BF4_1.TXT"   "T00346127_BF3_1.TXT"  
+#[10] "T00346117_BMS16_1.TXT" "T00346136_BMS10_1.TXT" "T00346122_BMS8_1.TXT" 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# prototype. . . is my idea useful?
+# (1) it would be nice to look at those outliers: Are they the same set of genes?
+# they seem to be the ones affected by BF
+# (2) I need to do more checking to make sure the strange outliers are real
+# check the data set agains replicates. . . Should do it. . . now. . . will wait.
+
+samples_Loessed
+# dim(samples_Loessed)
+[1] 16767    22
+# gotta do the minus 1 below.  
+# dropped the first ff4 from the data set.
+names(samples_Loessed)[paired_microarray_samples-1]
+# [1] "T00346131_FF15_1.TXT"  "T00346128_FF13_1.TXT" 
+# [3] "T00346135_FF7_1.TXT"   "T00346118_FF5_1.TXT"  
+# [5] "T00346125_FF3_1.TXT"   "T00346121_FF2_1.TXT"  
+# [7] "T00346134_BF6_1.TXT"   "T00346119_BF4_1.TXT"  
+# [9] "T00346127_BF3_1.TXT"   "T00346117_BMS16_1.TXT"
+#[11] "T00346136_BMS10_1.TXT" "T00346122_BMS8_1.TXT" 
+
+
+# this is how samples_Loessed was made:
+# So this just matches up
+
+samples_NCBIanno_Loessed = samples_NCBIanno[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+samples_IDref_Loessed = samples_IDref[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+samples_probeNames_Loessed= samples_probeNames[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+
+samples_Annotation_OGS_Loessed = samples_Annotation_OGS[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+samples_Annotation_UniGene_Loessed = samples_Annotation_UniGene[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+samples_GO_Molecular_func_Loessed = samples_GO_Molecular_func[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+samples_GO_biological_proc_Loessed = samples_GO_biological_proc[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+samples_GO_cellular_comp_Loessed = samples_GO_cellular_comp[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+
+samples_flags_Loessed=samples_flags[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,2:23]
+
+
+# summarizing what we've got as far as annotation.  from codelink
+
+par(mfrow=c(1,1))
+par(mar=c(9,4,3,1))
+barplot(c(
+length(unique(samples_NCBIanno_Loessed))/length(samples_NCBIanno_Loessed),
+length(unique(samples_Annotation_UniGene_Loessed))/length(samples_Annotation_UniGene_Loessed),
+length(unique(samples_Annotation_OGS_Loessed))/length(samples_Annotation_OGS_Loessed),
+length(unique(samples_GO_Molecular_func_Loessed))/length(samples_NCBIanno_Loessed),
+length(unique(samples_GO_biological_proc_Loessed))/length(samples_NCBIanno_Loessed),
+length(unique(samples_GO_cellular_comp_Loessed))/length(samples_NCBIanno_Loessed)),space=c(0),
+main=paste("Percent of useful probes (n=", length(samples_NCBIanno_Loessed), ") annotated", sep=""))
+axis(1,1:6-.5,c("RefSeq/GenBank", "UniGene", "OGS", "GO:MF","GO:BP", "GO:CC"),las=2)
+text(1:6-.5,
+c(
+length(unique(samples_NCBIanno_Loessed))/length(samples_NCBIanno_Loessed),
+length(unique(samples_Annotation_UniGene_Loessed))/length(samples_Annotation_UniGene_Loessed),
+length(unique(samples_Annotation_OGS_Loessed))/length(samples_Annotation_OGS_Loessed),
+length(unique(samples_GO_Molecular_func_Loessed))/length(samples_NCBIanno_Loessed),
+length(unique(samples_GO_biological_proc_Loessed))/length(samples_NCBIanno_Loessed),
+length(unique(samples_GO_cellular_comp_Loessed))/length(samples_NCBIanno_Loessed)),
+c(
+length(unique(samples_NCBIanno_Loessed)),
+length(unique(samples_Annotation_UniGene_Loessed)),
+length(unique(samples_Annotation_OGS_Loessed)),
+length(unique(samples_GO_Molecular_func_Loessed)),
+length(unique(samples_GO_biological_proc_Loessed)),
+length(unique(samples_GO_cellular_comp_Loessed))),xpd=TRUE)
+
+
+# we first tried using the ncbi accession -- that include both refseq and genbank.. 
+#so we quit that, and . . . see below..er 
+# WE HAD TO REMOVE THE ENDS OF THESE AS THEY DIDN'T MAP TO DAVID
+what_are_these=NULL
+samples_NCBIanno_Loessed_scott = samples_NCBIanno_Loessed
+for(i in 1:length(samples_NCBIanno_Loessed))
+{
+	if(substr(samples_NCBIanno_Loessed[i], nchar(samples_NCBIanno_Loessed[i])-1, nchar(samples_NCBIanno_Loessed[i])-1)=='.')
+	{
+		samples_NCBIanno_Loessed_scott[i] = substr(samples_NCBIanno_Loessed[i], 1, nchar(samples_NCBIanno_Loessed[i])-2)
+	}
+
+	if(substr(samples_NCBIanno_Loessed[i], nchar(samples_NCBIanno_Loessed[i])-2, nchar(samples_NCBIanno_Loessed[i])-2)=='.')
+	{
+		samples_NCBIanno_Loessed_scott[i] = substr(samples_NCBIanno_Loessed[i], 1, nchar(samples_NCBIanno_Loessed[i])-3)
+	}
+
+	if(substr(samples_NCBIanno_Loessed[i], nchar(samples_NCBIanno_Loessed[i])-1, nchar(samples_NCBIanno_Loessed[i])-1)!='.')
+	{
+		what_are_these = c(what_are_these, i)
+	}	
+}
+samples_NCBIanno_Loessed_scott[what_are_these]
+
+write.table(samples_NCBIanno_Loessed_scott, "~/Desktop/ChapkinLab/Iddo/current_gene_list.txt", row.names=FALSE, col.names=FALSE, sep='\t',quote=FALSE)
+
+
+
+
+
+# let's send the OGS to David, and take a look at the Panther
+write.table(unique(samples_Annotation_OGS_Loessed), "~/Desktop/ChapkinLab/Iddo/current_gene_list.txt", row.names=FALSE, col.names=FALSE, sep='\t',quote=FALSE)
+
+# did some stuff on David. . . kickass 
+# . . . uh.. this is going to be hard to work with. 
+# okay, we got Panther Molecular Function.  It has a category called immunity and defense 
+wtf=read.table("~/Desktop/ChapkinLab/Iddo/PANTHER_BP.txt", sep='\t', header=TRUE,
+stringsAsFactors=FALSE)
+dim(wtf)
+names(wtf)
+wtf[1:2,]
+# this is the group we're going to work with
+
+par(mfrow=c(1,1))
+par(mar=c(17,3,3,1))
+panther_ranking=sort(wtf$Count,index.return=TRUE,decreasing = TRUE)$ix
+barplot(wtf$Count[panther_ranking[1:20]],space=0,main="Probes assigned to Panther MF's")
+axis(1,1:20-.5, wtf$Term[panther_ranking[1:20]],las=2)
+
+
+
+ImmunologyStuff=which(wtf$Term=="BP00148:Immunity and defense")
+Gene_List = wtf$Genes[ImmunologyStuff] 
+
+parse_this_shit = NULL
+for(i in 1:wtf$Count[ImmunologyStuff])
+{
+	deliniation=regexpr(", ", Gene_List)
+	parse_this_shit=c(parse_this_shit, substr(Gene_List,1, deliniation-1))
+	Gene_List = substr(Gene_List,deliniation+2,nchar(Gene_List))
+}
+parse_this_shit=c(parse_this_shit, Gene_List)
+
+
+# so now, let's just look at the immunological genes
+Immunology_Probes = 1:length(samples_Annotation_OGS_Loessed)
+for(i in 1:length(samples_Annotation_OGS_Loessed))
+{
+	Immunology_Probes[i]=sum(samples_Annotation_OGS_Loessed[i]==parse_this_shit)
+}
+sum(Immunology_Probes)
+Immunology_Probes=Immunology_Probes==1
+unique(samples_Annotation_OGS_Loessed[Immunology_Probes])
+
+# cuts the data set down to just those Immunology genes
+
+samples_NCBIanno_Loessed_Immuno = samples_NCBIanno_Loessed[Immunology_Probes]
+samples_IDref_Loessed_Immuno = samples_IDref_Loessed[Immunology_Probes]
+samples_probeNames_Loessed_Immuno= samples_probeNames_Loessed[Immunology_Probes]
+
+samples_Annotation_OGS_Loessed_Immuno = samples_Annotation_OGS_Loessed[Immunology_Probes]
+samples_Annotation_UniGene_Loessed_Immuno = samples_Annotation_UniGene_Loessed[Immunology_Probes]
+samples_GO_Molecular_func_Loessed_Immuno = samples_GO_Molecular_func_Loessed[Immunology_Probes]
+samples_GO_biological_proc_Loessed_Immuno = samples_GO_biological_proc_Loessed[Immunology_Probes]
+samples_GO_cellular_comp_Loessed_Immuno = samples_GO_cellular_comp_Loessed[Immunology_Probes]
+
+samples_Loessed_Immuno=samples_Loessed[Immunology_Probes,]
+samples_flags_Loessed_Immuno=samples_flags_Loessed[Immunology_Probes,]
+
+dim(samples_Loessed_Immuno)
+length(samples_Annotation_OGS_Loessed_Immuno)
+length(unique(samples_Annotation_OGS_Loessed_Immuno))
+
+
+# Just seeing what we've got data wise from the immunology stuff
+
+
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+names(samples_Loessed_Immuno)[treatA]
+
+par(mfrow=c(1,3))
+par(mar=c(5,4,3,1))
+
+Immuno_pvalues = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+for(i in 1:length(samples_Annotation_OGS_Loessed_Immuno))
+{
+	Immuno_pvalues[i] = t.test(samples_Loessed_Immuno[i, treatA], samples_Loessed_Immuno[i, treatB])$p.value
+}
+a_small_interesting_Immunology_subset = which(Immuno_pvalues<=sort(Immuno_pvalues)[3]) 
+# scotts_Immunology_set = samples_Loessed_Immuno[a_small_interesting_Immunology_subset, c(treatA, treatB)] 
+
+scotts_Immunology_set = samples_Loessed_Immuno[a_small_interesting_Immunology_subset, c(treatA, treatB)]
+
+
+
+plot(apply(samples_Loessed_Immuno[, treatA],1,mean,na.rm=TRUE),
+apply(samples_Loessed_Immuno[, treatB],1,mean,na.rm=TRUE),
+main=c("Immunological genes", "n_FF=6, n_BF=6"), xlab="FF averages", ylab="BF averages")
+abline(0,1)
+
+points(apply(scotts_Immunology_set[, 1:6],1,mean,na.rm=TRUE), 
+apply(scotts_Immunology_set[, 7:12],1,mean,na.rm=TRUE),col='red',cex=3)
+points(apply(scotts_Immunology_set[, 1:6],1,mean,na.rm=TRUE), 
+apply(scotts_Immunology_set[, 7:12],1,mean,na.rm=TRUE),col='blue',cex=1)
+abline(0,1)
+samples_Annotation_OGS_Loessed_Immuno[a_small_interesting_Immunology_subset]
+
+
+
+hist(Immuno_pvalues, main=c("t.test p-values", "n_FF=6, n_BF=6"), xlab="p-values")
+hist(qvalue(Immuno_pvalues)$qvalues,add=TRUE,col='blue')
+legend('topright',"Storey FDR", fill='blue')
+
+Immuno_pvalues = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+Immuno_foldchange_BF_FF = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+Immuno_logGE_BF = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+Immuno_logGE_FF = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+for(i in 1:length(samples_Annotation_OGS_Loessed_Immuno))
+{
+	Immuno_logGE_BF[i] = mean(as.numeric(samples_Loessed_Immuno[i, 10:22]),na.rm=TRUE)
+	Immuno_logGE_FF[i] = mean(as.numeric(samples_Loessed_Immuno[i, 1:9]),na.rm=TRUE)
+	Immuno_foldchange_BF_FF[i] = Immuno_logGE_BF[i] - Immuno_logGE_FF[i]
+	Immuno_pvalues[i] = t.test(samples_Loessed_Immuno[i, 1:9], samples_Loessed_Immuno[i, 10:22])$p.value
+}
+hist(Immuno_pvalues, main=c("t.test p-values", "n_FF=9, n_BF=13"), xlab="p-values")
+hist(qvalue(Immuno_pvalues)$qvalues,add=TRUE,col='blue')
+legend('topright',"Storey FDR", fill='blue')
+
+story_corrected = qvalue(Immuno_pvalues)$qvalues
+sum(story_corrected < .2)
+
+
+write.table(
+data.frame("name"=samples_Annotation_OGS_Loessed_Immuno, "log(BF/FF,2)"=Immuno_foldchange_BF_FF, "p"=Immuno_pvalues, "q"=story_corrected, "log(BF,2)"=Immuno_logGE_BF, "log(FF,2)"=Immuno_logGE_FF,samples_Loessed_Immuno), 
+"~/Desktop/ChapkinLab/Iddo/immuno_genes_DE2.txt", row.names=FALSE, col.names=TRUE, sep='\t',quote=FALSE)
+
+
+
+samples_Annotation_OGS_Loessed_Immuno[Immuno_pvalues <.05 &  story_corrected < .2]
+
+
+a_small_interesting_Immunology_subset = which(story_corrected < .25)
+
+
+plot(Immuno_pvalues, qvalue(Immuno_pvalues)$qvalues)
+plot(Immuno_pvalues, story_corrected)
+
+
+
+# example of run through of entire pipeline
+# here I make a subset of stuff
+
+
+a_small_interesting_Immunology_subset = which(Immuno_pvalues <= sort(Immuno_pvalues)[3])
+
+Immuno_pvalues[a_small_interesting_Immunology_subset] 
+story_corrected[a_small_interesting_Immunology_subset]  
+Immuno_foldchange_BF_FF[a_small_interesting_Immunology_subset] 
+samples_Annotation_OGS_Loessed_Immuno[a_small_interesting_Immunology_subset]
+
+ 
+scotts_Immunology_set = samples_Loessed_Immuno[a_small_interesting_Immunology_subset, c(treatA, treatB)]
+
+#seem to have lost my correlation plotting stuff.. ohwell.. make that later. 
+# -- i probably put it in the other file
+
+
+
+
+
+
+
+# Now, we're going to make a further data reduction, like this:
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+
+the_subset = 
+(apply(samples_flags_Loessed[,treatA]=='L',1,sum,na.rm=TRUE)<4 |
+ apply(samples_flags_Loessed[,treatB]=='L',1,sum,na.rm=TRUE)<4 ) &
+(apply(is.na(samples_Loessed[,treatA]),1,sum,na.rm=TRUE)<2 &
+ apply(is.na(samples_Loessed[,treatB]),1,sum,na.rm=TRUE)<2 ) 
+summary(the_subset)
+
+
+samples_Loessed_subset = samples_Loessed[the_subset,]
+samples_NCBIanno_Loessed_subset = samples_NCBIanno_Loessed[the_subset] 
+samples_IDref_Loessed_subset = samples_IDref_Loessed[the_subset] 
+samples_probeNames_Loessed_subset = samples_probeNames_Loessed[the_subset] 
+
+
+
+
+subset_selection=1:sum(the_subset)
+analysis_hostgene_list = samples_Loessed_subset[subset_selection,paired_microarray_samples-1]
+subset_genes = samples_probeNames[subset_selection] # might use NCBI or other identifier
+analysis_bacteria_list=iddo_phylum_percents[,4:5]
+
+
+lm_coef_pvalues=matrix(NA,nrow=length(subset_selection),ncol=3)
+#names(lm_coef_pvalues)=c("Firmicutes","Actinobacteria","BF")
+lm_coef_values=matrix(NA,nrow=length(subset_selection),ncol=4)
+#names(lm_coef_pvalues)=c("int","Firmicutes","Actinobacteria","BF")
+lm_r_squareds=1:length(subset_selection)
+lm_Fpvals=1:length(subset_selection)
+for(i in 1:length(subset_selection))
+{
+	gene_i_plus_microb = data.frame(t(analysis_hostgene_list[i,]), analysis_bacteria_list,"treat"=c(rep(0,6),rep(1,6)))
+	names(gene_i_plus_microb)[1]="GE"
+	names(gene_i_plus_microb)[4]="BF"
+
+	tmp=lm(GE~Firmicutes+Actinobacteria+BF, data=gene_i_plus_microb) 
+	#+Actinobacteria+Proteobacteria+Bacteroidetes
+	summary(tmp)
+	lm_coef_pvalues[i,1:3]=summary(tmp)$coefficients[2:4,4]
+	lm_coef_values[i,1:4]=summary(tmp)$coefficients[1:4,1]
+	lm_r_squareds[i]=summary(tmp)$r.squared
+
+	tmp=summary(tmp)$fstatistic 
+	lm_Fpvals[i]=1-pf(tmp["value"],tmp["numdf"],tmp["dendf"])
+
+	#Verrucomicrobia+Un_sub_classified
+}
+
+
+par(mfrow=c(2,2))
+par(mar=c(5,4,2,1))
+hist(lm_Fpvals, main="F test p values",xlab="p-value")
+hist(qvalue(lm_Fpvals)$qvalues, main="Storey FDR qvalue correction",xlab="q-value")
+
+best_results = lm_coef_pvalues < .05
+best_results = apply(best_results,1,sum)==3
+
+hist(lm_r_squareds, main="Model R^2 for all genes fit",xlab="R^2")
+legend('topright',
+"Models with coef. 
+p-values < .05",
+col="green",fill="green")
+hist(lm_r_squareds[best_results],add=TRUE,col='green')
+hist(apply(lm_coef_pvalues,1,max),
+main="Largest coef. p-value",xlab="p-value")
+legend('topleft',
+"Models with coef. p-values < .05",col="green",fill="green")
+hist(apply(lm_coef_pvalues,1,max)[best_results],add=TRUE,col='green')
+
+
+
+interesting_lm_coef_pvalues=lm_coef_pvalues[best_results,]
+interesting_lm_coef_values=lm_coef_values[best_results,]
+interesting_lm_r_squareds =lm_r_squareds[best_results]
+interesting_samples_NCBIanno_subset = samples_NCBIanno_Loessed_subset[best_results]
+interesting_lm_Fpvals =lm_Fpvals[best_results]
+
+
+
+iddo_initial_results=data.frame(
+interesting_samples_NCBIanno_subset,
+interesting_lm_r_squareds,
+interesting_lm_coef_values,
+interesting_lm_coef_pvalues)
+
+names(iddo_initial_results)=
+c("NCBIanno","r.squared","Intercept","Firmicutes.coef","Actinobacter.coef","BF.indicator",
+"Firm.coef.p","Actino.coef.p","BF.coef.p")
+
+write.table(iddo_initial_results,
+"~/Desktop/ChapkinLab/Iddo/current_results_Loessed.csv",sep=',',row.names=FALSE)
+
+
+interesting_hostgene_data = analysis_hostgene_list[best_results,]
+sum(best_results)
+
+par(mfrow=c(1,1))
+par(mar=c(5,5,3,1))
+
+fgrid=seq(0,.6,.01)
+agrid=seq(0,.8,.01)
+surf=matrix(NA,nrow=length(agrid),ncol=length(fgrid))
+
+tmp=sort(interesting_lm_r_squareds,index.return=TRUE,decreasing=TRUE)
+gene=cbind(tmp$x ,tmp$ix)[jj,2]
+for(f in 1:length(fgrid))
+for(a in 1:length(agrid))
+{
+	surf[a,f]=interesting_lm_coef_values[gene,1]+
+		interesting_lm_coef_values[gene,2]*fgrid[f]+
+		interesting_lm_coef_values[gene,3]*agrid[a]
+}
+surf[,1:sum(1:length(fgrid)*(fgrid==.2))]=surf[,1:sum(1:length(fgrid)*(fgrid==.2))]+interesting_lm_coef_values[gene,4]
+image(fgrid,agrid,t(surf),col=terrain.colors(100),
+main=c(paste(
+signif(interesting_lm_coef_values[gene,1],2), " + ",
+signif(interesting_lm_coef_values[gene,2],2), " F +",
+signif(interesting_lm_coef_values[gene,3],2), " A +",
+signif(interesting_lm_coef_values[gene,4],2), "(BF)"),
+paste(
+"R^2 = ", signif(interesting_lm_r_squareds[gene],2),
+", F test p-value = ", signif(interesting_lm_Fpvals[gene],3),sep="")),
+xlab="Firmacutes", ylab="Actinobacteria"
+)
+colorbar.plot(.3,.7,1:20,col=terrain.colors(100),horizontal=TRUE,strip.width=.15)
+	text(.2,.7,paste(signif(min(surf),2)))
+	text(.3,.7,paste(signif(median(surf),2)))
+	text(.4,.7,paste(signif(max(surf),2)))
+symbols(x = analysis_bacteria_list[,1], y = analysis_bacteria_list[,2], circles = interesting_hostgene_data[gene,]-min(interesting_hostgene_data[gene,],na.rm=TRUE)+.2, main = "Circles Plot",inches=.5,add=TRUE,col='red')
+jj=jj+1
+
+
+
+
+
+
+
+
+
+
+
+
+# okay, let's do the DE tests
+# yeah, okay, everything's significant
+treatA=1:10
+treatB=c(11:16,18:23)
+
+the_subset = 
+(apply(samples_flags[,treatA]=='L',1,sum,na.rm=TRUE)<5 |
+ apply(samples_flags[,treatB]=='L',1,sum,na.rm=TRUE)<6 ) &
+(apply(is.na(samples_RawVals[,treatA]),1,sum,na.rm=TRUE)<5 &
+ apply(is.na(samples_RawVals[,treatB]),1,sum,na.rm=TRUE)<6 ) 
+
+the_subset = 
+(apply(samples_flags[,treatA]=='G',1,sum,na.rm=TRUE)==10 |
+ apply(samples_flags[,treatB]=='G',1,sum,na.rm=TRUE)==12 ) 
+
+sum(the_subset) 
+# I'm not getting what Chen got. . . maybe because repeated data set?
+# maybe because chen used the faulty zr program? 
+
+barplot(apply(samples_flags[,c(treatB,treatA)]=='G',2,sum))
+
+
+
+
+samples_RawVals_subset = samples_RawVals[the_subset,]
+samples_NCBIanno_subset = samples_NCBIanno[the_subset] 
+samples_IDref_subset = samples_IDref[the_subset] 
+
+
+
+wilcox_ps = rep(NA,dim(samples_RawVals_subset)[1])
+for(i in 1:dim(samples_RawVals_subset)[1])
+{
+	wilcox_ps[i]=wilcox.test(as.numeric(samples_RawVals_subset[i,treatA]), as.numeric(samples_RawVals_subset[i,treatB]))$p.value	
+i=i+1
+}
+
+samples_NCBIanno_subset[i]
+samples_IDref_subset[i]
+
+(1:length(samples_NCBIanno))[(samples_IDref==samples_IDref_subset[i])]
+
+hist(wilcox_ps)
+
+sort(as.numeric(unique(samples_RawVals_subset[i,c(treatA,treatB)])))
+
+
+cbind(as.numeric(unique(samples_RawVals_subset[i,c(treatA,treatB)])),
+as.numeric(samples_RawVals_subset[i,c(treatA,treatB)]))
+
+wilcox.test(as.numeric(samples_RawVals_subset[i,treatA]), as.numeric(samples_RawVals_subset[i,treatB]))$p.value
+
+
+
+
+
+
+# curious about outliers:
+# This is good to look at
+# could do outlier detection on raw values.. . forget about negatives until after.. .
+# if they're left.. . that sounds pretty good. . .
+
+
+total=dim(samples_RawVals)[1]#500
+outliers=samples_RawVals
+outliers=as.matrix(outliers)
+outliers[]=0
+for(i in 1:total)#)
+{
+	# remove outliers by method of boxplot
+	tmp=boxplot(log(as.numeric(samples_RawVals[i,group]),2), plot=FALSE)$out
+	for(j in tmp)
+	{
+		tmp2=log(as.numeric(samples_RawVals[i,group]),2)
+		tmp2[is.na(tmp2)]=0
+		outliers[i,group] = outliers[i,group] + (j == tmp2)	
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# scratch below. . . 
+# was getting dominated by the data . . . cuz i can't handle my code . . . lol.
+
+
+
+
+plot(c(as.numeric(tmp_x)),c(as.numeric(tmp_y)),xlab="sample average",ylab="sample - sample mean",
+main=paste(i))
+plot(c(as.numeric(tmp_x)),c(as.numeric(tmp_y)),xlab="sample average",ylab="sample - sample mean",
+main=paste(i),col='black')
+for(i in 1:length(group))
+{
+points(tmp_x[,i],tmp_y[,i], col=rainbow(length(group))[i],pch='.',cex=2.5)
+}
+
+
+hist(number_outliers)
+#hist(data_range)
+
+
+tmp=log(samples_RawVals[1:total,group],2)-xbars
+tmp=as.matrix(tmp)
+tmp[number_outliers>0,]=NA
+#can't use this.. .: dependent on expression levels. 
+#tmp[breaks_sd_range_cutoff==TRUE,]=NA
+#sum(breaks_sd_range_cutoff==TRUE | number_outliers>0)
+
+
+#1:dim(samples_RawVals)[1]
+xs=matrix(rep(xbars,length(group)),nrow=total,ncol=length(group),byrow=FALSE)
+
+window=dim(samples_RawVals)[1]#5000 
+tmp_x = xs[1:window,]
+tmp_y = tmp[1:window,]
+plot(c(as.numeric(tmp_x)),c(as.numeric(tmp_y)),xlab="sample average",ylab="sample - sample mean",
+main="FF examples outliers removed")
+#main="BF examples")
+#main="Premie examples")
+
+
+
+
+
+
+
+# scratch.. .
+# if you wanted to look at all the datas.. . they're similar to the first above
+# first is representative
+for(i in 1:(dim(samples_RawVals)[1]/window))
+{
+tmp_x = xs[window*i+1:(2*window),]
+tmp_y = tmp[window*i+1:(2*window),]
+	plot(c(as.numeric(tmp_x)),c(as.numeric(tmp_y)))
+}	
+
+# scratch
+#boxplot(log(as.numeric(samples_RawVals[i,group]),2), plot=TRUE)
+#i=i+1
+
+
+
+# scratch: checking out saturated points.. .don't think it's an issue
+hist(samples_RawVals[samples_flags=='S'])
+hist(log(samples_RawVals[samples_flags=='S'],2))
+hist(samples_RawVals[samples_flags!='S'])
+hist(samples_RawVals[samples_RawVals>10000])
+hist(log(samples_RawVals[samples_RawVals>10000],2))
+tmpY = apply(log(samples_RawVals[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(samples_RawVals[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY
+Xs=tmpX
+plot(Xs,Ys)
+tmp=samples_RawVals
+tmp[samples_flags=='S']=NA
+tmpY = apply(log(tmp[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(tmp[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY
+Xs=tmpX
+plot(Xs,Ys,col='red')
+
+
+
+
+
+
+
+
+
+
+
+# look at pairwise differences
+# extremely interesting: regression to the mean.. . I'm observing regression to the mean
+# at one time I had a lot of stuff here plotting like, X verse Y-X and so on. ..
+# it was imbalanced though. .. mattered which one was X and which was Y.. .
+# so, instead, plotted x verse y and then did a rotation, and worked from that
+# very interestingly, this was almost identical to the MA plot
+
+
+# x verse y plot
+
+par(mfrow=c(2,3))
+par(mar=c(4,4,4,1))
+tmpY = apply(log(samples_RawVals[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(samples_RawVals[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY
+Xs=tmpX
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),1/3)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),1/3)
+
+Xrange=range(Xs,na.rm=TRUE,finite=TRUE)
+Yrange=range(Ys,na.rm=TRUE,finite=TRUE)
+
+plot(Xs,Ys)
+lm(Ys~Xs,2))
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+
+
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+par(mar=c(5,5,5,1))
+plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+abline(0,1,col='blue')
+abline(
+lm(Ys~Xs,2))
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+# This version took a long time and didn't work: 
+# my_1st_loess = loess(log(samples_RawVals[,11]/samples_RawVals[,10],2)~log(samples_RawVals[,10],2))
+# points(predict(my_1st_loess), my_1st_loess$x,col='blue')
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),xlab="FF",ylab="BF-FF",,xlim=Xrange,ylim=Yrange)
+tmp=(hist3d)
+tmp[tmp==0]=NA
+#this one is done with wider grid.. . so we can see it
+######contour(Xseq,Yseq,t(log(hist3d)),add=TRUE) 
+# colorbar.plot(5,20,strip=1:20,col=tim.colors(20),horizontal=FALSE)
+abline(0,0)
+lines(c(0,0),c(-10000,10000))
+points(my_2nd,col='red',pch='.',cex=3)
+
+plot(1:20,1:20,col="white",axes=FALSE,xlab="",ylab="")
+colorbar.plot(10.5,10.5,1:20,col=terrain.colors(20),horizontal=TRUE,strip.width=1/3)
+for(i in 1:20)
+{
+	text(21-i,21-i,paste(floor(quantile(tmp,seq(1,20,1)/20,na.rm=TRUE))[21-i]),col="black",cex=.75)
+}
+
+
+
+
+
+# x verse y
+# I rotated things.. . looks nice.. . actually, looks just like MA plot. .. what?
+
+# raw data
+
+par(mfrow=c(3,3))
+tmpY = apply(log(samples_RawVals[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(samples_RawVals[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY
+Xs=tmpX
+
+theta=pi/4
+#plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+tmp=cbind(Xs,Ys)%*%matrix(c(cos(theta),-sin(theta),sin(theta),cos(theta)),nrow=2,ncol=2,byrow=TRUE)
+#plot(tmp[,1],tmp[,2])
+
+Xs=tmp[,1]
+Ys=tmp[,2]
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+#points(my_2nd,col='red')
+
+
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),1/3)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),1/3)
+Xrange=range(Xs,na.rm=TRUE,finite=TRUE)
+Yrange=range(Ys,na.rm=TRUE,finite=TRUE)
+
+
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+
+par(mar=c(3,3,3,1))
+plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+abline(0,0,col='blue')
+#abline(0,1,col='blue')
+abline(
+lm(Ys~Xs))
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+# This version took a long time and didn't work: 
+# my_1st_loess = loess(log(samples_RawVals[,11]/samples_RawVals[,10],2)~log(samples_RawVals[,10],2))
+# points(predict(my_1st_loess), my_1st_loess$x,col='blue')
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),xlab="FF",ylab="BF-FF",,xlim=Xrange,ylim=Yrange)
+tmp=(hist3d)
+tmp[tmp==0]=NA
+#this one is done with wider grid.. . so we can see it
+######contour(Xseq,Yseq,t(log(hist3d)),add=TRUE) 
+# colorbar.plot(5,20,strip=1:20,col=tim.colors(20),horizontal=FALSE)
+abline(0,0)
+lines(c(0,0),c(-10000,10000))
+points(my_2nd,col='red',pch='.',cex=3)
+
+plot(1:20,1:20,col="white",axes=FALSE,xlab="",ylab="")
+colorbar.plot(10.5,10.5,1:20,col=terrain.colors(20),horizontal=TRUE,strip.width=1/3)
+for(i in 1:20)
+{
+	text(21-i,21-i,paste(floor(quantile(tmp,seq(1,20,1)/20,na.rm=TRUE))[21-i]),col="black",cex=.75)
+}
+
+
+
+# loess normalized data on the basis of means
+
+ma_norm_offset=1:length(Xs)
+for(i in 1:length(Xs))
+{
+	ma_norm_offset[i]=my_2nd$y[Xs[i]==my_2nd$x]	
+}
+
+#plot(Xs,Ys-ma_norm_offset)
+Xs=Xs
+Ys=Ys-ma_norm_offset
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+#points(my_2nd,col='red')
+abline(0,0)
+
+
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),1/3)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),1/3)
+
+Xrange=range(Xs,na.rm=TRUE,finite=TRUE)
+Yrange=range(Ys,na.rm=TRUE,finite=TRUE)
+
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+
+
+plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+#abline(0,1,col='blue')
+abline(0,0,col='blue')
+abline(
+lm(Ys~Xs))
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+# This version took a long time and didn't work: 
+# my_1st_loess = loess(log(samples_RawVals[,11]/samples_RawVals[,10],2)~log(samples_RawVals[,10],2))
+# points(predict(my_1st_loess), my_1st_loess$x,col='blue')
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),xlab="FF",ylab="BF-FF",,xlim=Xrange,ylim=Yrange)
+tmp=(hist3d)
+tmp[tmp==0]=NA
+#this one is done with wider grid.. . so we can see it
+######contour(Xseq,Yseq,t(log(hist3d)),add=TRUE) 
+# colorbar.plot(5,20,strip=1:20,col=tim.colors(20),horizontal=FALSE)
+abline(0,0)
+lines(c(0,0),c(-10000,10000))
+points(my_2nd,col='red',pch='.',cex=3)
+
+plot(1:20,1:20,col="white",axes=FALSE,xlab="",ylab="")
+colorbar.plot(10.5,10.5,1:20,col=terrain.colors(20),horizontal=TRUE,strip.width=1/3)
+for(i in 1:20)
+{
+	text(21-i,21-i,paste(floor(quantile(tmp,seq(1,20,1)/20,na.rm=TRUE))[21-i]),col="black",cex=.75)
+}
+
+
+# loess normalized same as above, but first throw away L flags
+
+tmp=samples_RawVals
+tmp[samples_flags=='L']=NA
+tmpY = apply(log(tmp[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(tmp[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY
+Xs=tmpX
+#Xrange=range(Xs,na.rm=TRUE,finite=TRUE)
+Yrange=range(Ys,na.rm=TRUE,finite=TRUE)
+
+theta=pi/4
+#plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+tmp=cbind(Xs,Ys)%*%matrix(c(cos(theta),-sin(theta),sin(theta),cos(theta)),nrow=2,ncol=2,byrow=TRUE)
+#plot(tmp[,1],tmp[,2],xlim=Xrange)
+
+Xs=tmp[,1]
+Ys=tmp[,2]
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+#abline(0,0)
+
+
+ma_norm_offset=1:length(Xs)
+for(i in 1:length(Xs))
+{
+	ma_norm_offset[i]=my_2nd$y[Xs[i]==my_2nd$x]	
+}
+
+
+#plot(Xs,Ys-ma_norm_offset)
+Xs=Xs
+Ys=Ys-ma_norm_offset
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+#points(my_2nd,col='red')
+#abline(0,0)
+
+
+
+
+
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),1/3)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),1/3)
+
+#Xrange=range(Xs,na.rm=TRUE,finite=TRUE)
+Yrange=range(Ys,na.rm=TRUE,finite=TRUE)
+
+hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+for(yy in 2:length(Yseq)-1)
+for(xx in 2:length(Xseq)-1)
+{
+	hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+}
+
+
+
+plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+#abline(0,1,col='blue')
+abline(0,0,col='blue')
+abline(
+lm(Ys~Xs))
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+# This version took a long time and didn't work: 
+# my_1st_loess = loess(log(samples_RawVals[,11]/samples_RawVals[,10],2)~log(samples_RawVals[,10],2))
+# points(predict(my_1st_loess), my_1st_loess$x,col='blue')
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),xlab="FF",ylab="BF-FF",,xlim=Xrange,ylim=Yrange)
+tmp=(hist3d)
+tmp[tmp==0]=NA
+#this one is done with wider grid.. . so we can see it
+######contour(Xseq,Yseq,t(log(hist3d)),add=TRUE) 
+# colorbar.plot(5,20,strip=1:20,col=tim.colors(20),horizontal=FALSE)
+abline(0,0)
+lines(c(0,0),c(-10000,10000))
+points(my_2nd,col='red',pch='.',cex=3)
+
+plot(1:20,1:20,col="white",axes=FALSE,xlab="",ylab="")
+colorbar.plot(10.5,10.5,1:20,col=terrain.colors(20),horizontal=TRUE,strip.width=1/3)
+for(i in 1:20)
+{
+	text(21-i,21-i,paste(floor(quantile(tmp,seq(1,20,1)/20,na.rm=TRUE))[21-i]),col="black",cex=.75)
+}
+
+
+
+
+
+
+
+# Going to do a lowess normalization
+
+tmpY = apply(log(samples_RawVals[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(samples_RawVals[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY
+Xs=tmpX
+
+theta=pi/4
+plot(Xs,Ys)
+tmp=cbind(Xs,Ys)%*%matrix(c(cos(theta),-sin(theta),sin(theta),cos(theta)),nrow=2,ncol=2,byrow=TRUE)
+plot(tmp[,1],tmp[,2])
+
+Xs=tmp[,1]
+Ys=tmp[,2]
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+#points(my_2nd,col='red')
+
+ma_norm_offset=1:length(Xs)
+for(i in 1:length(Xs))
+{
+	ma_norm_offset[i]=my_2nd$y[Xs[i]==my_2nd$x]	
+}
+
+tmp= samples_RawVals
+for(s in 11:23)
+{
+	cbind(Xs,tmp[,i])%*%matrix(c(cos(theta),-sin(theta),sin(theta),cos(theta)),nrow=2,ncol=2,byrow=TRUE)
+
+}
+
+
+
+Xs=tmp[,1]
+Ys=tmp[,2]
+theta=-pi/4
+tmp=cbind(Xs,Ys)%*%matrix(c(cos(theta),-sin(theta),sin(theta),cos(theta)),nrow=2,ncol=2,byrow=TRUE)
+plot(tmp[,1],tmp[,2])
+
+
+
+
+
+
+
+hist(as.numeric(my_2nd[[2]]))
+plot(as.numeric(my_2nd[[2]]))
+
+
+tmpY = apply(log(samples_RawVals[,11:23],2),1,mean,na.rm=TRUE)
+tmpX = apply(log(samples_RawVals[,1:10],2),1,mean,na.rm=TRUE)
+Ys=tmpY-tmpX
+Xs=tmpX
+Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2]),1/3)
+Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),1/3)
+Xrange=range(Xs,na.rm=TRUE,finite=TRUE)
+Yrange=range(Ys,na.rm=TRUE,finite=TRUE)
+plot(Xs,Ys,xlim=Xrange,ylim=Yrange)
+abline(
+lm(Ys~Xs,2))
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+my_2nd = lowess(DF$Xs,DF$Ys)
+points(my_2nd,col='red')
+
+
+
+
+tmp = samples_RawVals[,11:23] - as.numeric(my_2nd[[2]])
+plot(apply(samples_RawVals[,paired_microarray_samples[1:10]],1,mean,na.rm=TRUE),
+apply(tmp,1,mean,na.rm=TRUE))
+
+abline(0,0)
+
+
+
+
+
+# look at outliers?
+
+
+
+
+samples_RawVals[samples_RawVals<=0] = min(samples_RawVals[samples_RawVals>0],na.rm=TRUE)
+samples_RawVals[samples_flags=='L'] = min(samples_RawVals[samples_RawVals>0],na.rm=TRUE)
+samples_RawVals[samples_flags=='S'] = max(samples_RawVals[samples_RawVals>0],na.rm=TRUE)
+
+
+samples_NormVals[samples_NormVals==-9999]=NA
+samples_NormVals[samples_flags!='L' & samples_flags!='G' & samples_flags!='S']=NA
+samples_NormVals[samples_NormVals<=0] = min(samples_RawVals[samples_NormVals>0],na.rm=TRUE)
+samples_NormVals[samples_flags=='L'] = min(samples_RawVals[samples_NormVals>0],na.rm=TRUE)
+samples_NormVals[samples_flags=='S'] = max(samples_RawVals[samples_NormVals>0],na.rm=TRUE)
+
+# So.. . Do I want to remove outliers??
+
+
+
+# NEW IDEA: 
+
+
+
+plot(log(samples_RawVals[,11],2),log(samples_RawVals[,10],2))
+
+
+hist(log(samples_RawVals[,11]/samples_RawVals[,10],2))
+hist(log(samples_RawVals[,10],2))
+hist(log(samples_RawVals[,11],2))
+
+
+
+
+
+
+#MA plot and vocano plot and pvalue plot
+aveff=apply(samples_NormVals[,1:10],1,mean)
+avebf=apply(samples_NormVals[,11:23],1,mean)
+
+plot(.5*log(aveff+avebf,2),log(aveff/avebf,2),xlim=c(1,8))
+
+
+
+
+
+
+
+image(Xseq,Yseq,t(log(hist3d)),col=rainbow(10))
+# heatmap(Xseq,Yseq,log(hist3d))
+contour(Xseq,Yseq,t(log(hist3d)),add=TRUE)
+abline(
+lm(log(samples_RawVals[,11]/samples_RawVals[,10],2)~log(samples_RawVals[,10],2)))
+points(my_2nd,col='blue',pch='.',cex=1)
+
+library(fields)
+image.plot(Xseq,Yseq,t(log(hist3d)))
+
+
+#the following give some plots of flags and some boxplots for the samples
+
+par(mfrow=c(3,2))
+
+boxplot(log(samples_RawVals,2))
+breaks=c(10.5,18.5,23.5)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+boxplot(log(samples_NormVals,2))
+breaks=c(10.5,18.5,23.5)
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+plot(apply(samples_flags=='L',2,sum,na.rm=TRUE))
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+plot(apply(samples_flags=='G',2,sum,na.rm=TRUE))
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+tmp=samples_RawVals
+tmp[samples_flags!='G']=NA
+boxplot(log(tmp,2))
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+tmp=samples_NormVals
+tmp[samples_flags!='G']=NA
+boxplot(log(tmp,2))
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+
+# Looking at correlations between samples
+# I'm less interested in this. .. the question is:
+# Is it a sample effect or an actual effect?? 
+# and correlations don't really answer that.. . 
+
+samples_RawVals = log(samples_RawVals,2)
+FF_means = apply(samples_RawVals[all_data_sample_groups=="FF"], 1, mean, na.rm=TRUE)
+BFnBMS_means = apply(samples_RawVals[all_data_sample_groups=="BF"|all_data_sample_groups=="BMS"], 1, mean, na.rm=TRUE)
+premie_means = apply(samples_RawVals[all_data_sample_groups=="premie"], 1, mean, na.rm=TRUE)
+
+residuals = samples_RawVals
+
+residuals[all_data_sample_groups=="FF"] = samples_RawVals[all_data_sample_groups=="FF"] - FF_means
+residuals[all_data_sample_groups=="BF"|all_data_sample_groups=="BMS"] = samples_RawVals[all_data_sample_groups=="BF"|all_data_sample_groups=="BMS"] - BFnBMS_means
+residuals[all_data_sample_groups=="premie"] = samples_RawVals[all_data_sample_groups=="premie"] - premie_means
+
+par(mfrow=c(3,1))
+boxplot(residuals)
+boxplot(samples_RawVals)
+corrs=cor(residuals, use="pairwise.complete.obs")
+boxplot(corrs)
+abline(0,0)
+
+
+
+# this was just looking at fiducially and controls.
+
+samples_RawVals = log(samples_NormVals,2)
+
+par(mfrow=c(1,1))
+table(samples_probeTypes)
+tmp = samples_RawVals
+tmp = tmp[samples_probeTypes=="POSITIVE",]
+plot(1:length(tmp[1,]),tmp[1,],type='l',ylim=range(tmp,na.rm=TRUE))
+for(i in 1:length(tmp[,1]))
+	lines(1:length(tmp[i,]),tmp[i,],type='l')
+for(i in breaks)
+	lines(rep(i,2),c(-100000,100000))
+
+tmp = samples_RawVals
+tmp = tmp[samples_probeTypes=="NEGATIVE",]
+for(i in 1:length(tmp[,1]))
+	lines(1:length(tmp[i,]),tmp[i,],type='l',col='red')
+
+tmp = samples_RawVals
+tmp = tmp[samples_probeTypes=="FIDUCIAL",]
+for(i in 1:length(tmp[,1]))
+	lines(1:length(tmp[i,]),tmp[i,],type='l',col='yellow')
+# This plot makes sample 24 and sample 22 look very strange. . . maybe 25 too.
+# The area might matter.. .
+
+
+
+# At this point we still have all the flags: L, M, etc.
+table(samples_probeTypes)
+
+samples_RawVals = samples_RawVals[samples_probeTypes=='DISCOVERY',]
+samples_flags = samples_flags[samples_probeTypes=='DISCOVERY',]
+samples_NormVals = samples_NormVals[samples_probeTypes=='DISCOVERY',]
+dim(samples_RawVals)
+sum(samples_probeTypes=='DISCOVERY')
+
+samples_probeNames = samples_probeNames[samples_probeTypes=='DISCOVERY']
+samples_NCBIanno = samples_NCBIanno[samples_probeTypes=='DISCOVERY']
+samples_ProbeInfo = samples_ProbeInfo[samples_probeTypes=='DISCOVERY']
+samples_IDref = samples_IDref[samples_probeTypes=='DISCOVERY']
+samples_probeTypes = samples_probeTypes[samples_probeTypes=='DISCOVERY']
+
+
+
+boxplot(log(samples_RawVals,2))
+
+
+# scratch: mucking about
+#scratch.. .  just using all 'G" flags
+# samples_NormValsHOLD=samples_NormVals
+# samples_NormVals=samples_NormValsHOLD
+
+Mflagged = samples_flags=='M'
+numMflagged = apply(Mflagged,1,sum)
+apply(Mflagged,2,sum)
+
+Gflagged = samples_flags=='G'
+numGflagged = apply(Gflagged,1,sum)
+apply(Gflagged,2,sum)
+
+samples_NormVals = samples_NormVals[numMflagged==0,]
+
+samples_NormVals[samples_flags=='M']=NA
+boxplot(samples_NormVals)
+samples_NormVals = normalize.quantiles(as.matrix(samples_NormVals))
+
+
+#quantile normalization.. . just messing around.
+samples_NormVals = normalize.quantiles(as.matrix(samples_NormVals))
+boxplot(log(samples_NormVals,2))
+
+
+#MA plot and vocano plot and pvalue plot
+aveff=apply(samples_NormVals[,1:10],1,mean)
+avebf=apply(samples_NormVals[,11:23],1,mean)
+
+plot(.5*log(aveff+avebf,2),log(aveff/avebf,2),xlim=c(1,8))
+
+t.pvalues=1:dim(samples_NormVals)[1]
+for(i in 1:dim(samples_NormVals)[1])
+{
+	t.pvalues[i] = t.test(samples_NormVals[i,1:10], samples_NormVals[i,11:23])$p.value
+}
+plot(log(aveff/avebf,2),t.pvalues)
+
+hist(t.pvalues)
+
+
+
+
+
+# DAMIR data set: 
+
+
+
+
+
+
+
+
+

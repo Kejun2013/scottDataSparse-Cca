@@ -1,0 +1,592 @@
+This is pdfTeX, Version 3.1415926-2.3-1.40.12 (MiKTeX 2.9 64-bit) (preloaded format=pdflatex 2013.4.22)  5 MAR 2015 00:55
+entering extended mode
+**Rep_Scott.tex
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Rep_Scott.tex
+LaTeX2e <2011/06/27>
+Babel <v3.8m> and hyphenation patterns for english, afrikaans, ancientgreek, ar
+abic, armenian, assamese, basque, bengali, bokmal, bulgarian, catalan, coptic, 
+croatian, czech, danish, dutch, esperanto, estonian, farsi, finnish, french, ga
+lician, german, german-x-2009-06-19, greek, gujarati, hindi, hungarian, iceland
+ic, indonesian, interlingua, irish, italian, kannada, kurmanji, lao, latin, lat
+vian, lithuanian, malayalam, marathi, mongolian, mongolianlmc, monogreek, ngerm
+an, ngerman-x-2009-06-19, nynorsk, oriya, panjabi, pinyin, polish, portuguese, 
+romanian, russian, sanskrit, serbian, slovak, slovenian, spanish, swedish, swis
+sgerman, tamil, telugu, turkish, turkmen, ukenglish, ukrainian, uppersorbian, u
+senglishmax, welsh, loaded.
+("C:\Program Files\MiKTeX 2.9\tex\latex\base\article.cls"
+Document Class: article 2007/10/19 v1.4h Standard LaTeX document class
+("C:\Program Files\MiKTeX 2.9\tex\latex\base\size10.clo"
+File: size10.clo 2007/10/19 v1.4h Standard LaTeX file (size option)
+)
+\c@part=\count79
+\c@section=\count80
+\c@subsection=\count81
+\c@subsubsection=\count82
+\c@paragraph=\count83
+\c@subparagraph=\count84
+\c@figure=\count85
+\c@table=\count86
+\abovecaptionskip=\skip41
+\belowcaptionskip=\skip42
+\bibindent=\dimen102
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\graphics\graphicx.sty"
+Package: graphicx 1999/02/16 v1.0f Enhanced LaTeX Graphics (DPC,SPQR)
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\graphics\keyval.sty"
+Package: keyval 1999/03/16 v1.13 key=value parser (DPC)
+\KV@toks@=\toks14
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\graphics\graphics.sty"
+Package: graphics 2009/02/05 v1.0o Standard LaTeX Graphics (DPC,SPQR)
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\graphics\trig.sty"
+Package: trig 1999/03/16 v1.09 sin cos tan (DPC)
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\graphics.cfg"
+File: graphics.cfg 2007/01/18 v1.5 graphics configuration of teTeX/TeXLive
+)
+Package graphics Info: Driver file: pdftex.def on input line 91.
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\pdftex-def\pdftex.def"
+File: pdftex.def 2011/05/27 v0.06d Graphics/color for pdfTeX
+
+("C:\Program Files\MiKTeX 2.9\tex\generic\oberdiek\infwarerr.sty"
+Package: infwarerr 2010/04/08 v1.3 Providing info/warning/error messages (HO)
+)
+("C:\Program Files\MiKTeX 2.9\tex\generic\oberdiek\ltxcmds.sty"
+Package: ltxcmds 2011/11/09 v1.22 LaTeX kernel commands for general use (HO)
+)
+\Gread@gobject=\count87
+))
+\Gin@req@height=\dimen103
+\Gin@req@width=\dimen104
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\graphics\color.sty"
+Package: color 2005/11/14 v1.0j Standard LaTeX Color (DPC)
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\color.cfg"
+File: color.cfg 2007/01/18 v1.5 color configuration of teTeX/TeXLive
+)
+Package color Info: Driver file: pdftex.def on input line 130.
+)
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Sweavel.sty
+Package: Sweavel 
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\listings\listings.sty"
+\lst@mode=\count88
+\lst@gtempboxa=\box26
+\lst@token=\toks15
+\lst@length=\count89
+\lst@currlwidth=\dimen105
+\lst@column=\count90
+\lst@pos=\count91
+\lst@lostspace=\dimen106
+\lst@width=\dimen107
+\lst@newlines=\count92
+\lst@lineno=\count93
+\lst@maxwidth=\dimen108
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\listings\lstmisc.sty"
+File: lstmisc.sty 2014/03/04 1.5c (Carsten Heinz)
+\c@lstnumber=\count94
+\lst@skipnumbers=\count95
+\lst@framebox=\box27
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\listings\listings.cfg"
+File: listings.cfg 2014/03/04 1.5c listings configuration
+))
+Package: listings 2014/03/04 1.5c (Carsten Heinz)
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\fancyvrb\fancyvrb.sty"
+Package: fancyvrb 2008/02/07
+
+Style option: `fancyvrb' v2.7a, with DG/SPQR fixes, and firstline=lastline fix 
+<2008/02/07> (tvz)
+\FV@CodeLineNo=\count96
+\FV@InFile=\read1
+\FV@TabBox=\box28
+\c@FancyVerbLine=\count97
+\FV@StepNumber=\count98
+\FV@OutFile=\write3
+) ("C:\Program Files\MiKTeX 2.9\tex\latex\ltxmisc\relsize.sty"
+Package: relsize 2003/07/04 ver 3.1
+)) ("C:\Program Files\MiKTeX 2.9\tex\latex\ams\math\amsmath.sty"
+Package: amsmath 2000/07/18 v2.13 AMS math features
+\@mathmargin=\skip43
+
+For additional information on amsmath, use the `?' option.
+("C:\Program Files\MiKTeX 2.9\tex\latex\ams\math\amstext.sty"
+Package: amstext 2000/06/29 v2.01
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\ams\math\amsgen.sty"
+File: amsgen.sty 1999/11/30 v2.0
+\@emptytoks=\toks16
+\ex@=\dimen109
+))
+("C:\Program Files\MiKTeX 2.9\tex\latex\ams\math\amsbsy.sty"
+Package: amsbsy 1999/11/29 v1.2d
+\pmbraise@=\dimen110
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\ams\math\amsopn.sty"
+Package: amsopn 1999/12/14 v2.01 operator names
+)
+\inf@bad=\count99
+LaTeX Info: Redefining \frac on input line 211.
+\uproot@=\count100
+\leftroot@=\count101
+LaTeX Info: Redefining \overline on input line 307.
+\classnum@=\count102
+\DOTSCASE@=\count103
+LaTeX Info: Redefining \ldots on input line 379.
+LaTeX Info: Redefining \dots on input line 382.
+LaTeX Info: Redefining \cdots on input line 467.
+\Mathstrutbox@=\box29
+\strutbox@=\box30
+\big@size=\dimen111
+LaTeX Font Info:    Redeclaring font encoding OML on input line 567.
+LaTeX Font Info:    Redeclaring font encoding OMS on input line 568.
+\macc@depth=\count104
+\c@MaxMatrixCols=\count105
+\dotsspace@=\muskip10
+\c@parentequation=\count106
+\dspbrk@lvl=\count107
+\tag@help=\toks17
+\row@=\count108
+\column@=\count109
+\maxfields@=\count110
+\andhelp@=\toks18
+\eqnshift@=\dimen112
+\alignsep@=\dimen113
+\tagshift@=\dimen114
+\tagwidth@=\dimen115
+\totwidth@=\dimen116
+\lineht@=\dimen117
+\@envbody=\toks19
+\multlinegap=\skip44
+\multlinetaggap=\skip45
+\mathdisplay@stack=\toks20
+LaTeX Info: Redefining \[ on input line 2666.
+LaTeX Info: Redefining \] on input line 2667.
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\preprint\authblk.sty"
+Package: authblk 2001/02/27 1.3 (PWD)
+\affilsep=\skip46
+\@affilsep=\skip47
+\c@Maxaffil=\count111
+\c@authors=\count112
+\c@affil=\count113
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hyperref.sty"
+Package: hyperref 2012/05/13 v6.82q Hypertext links for LaTeX
+
+("C:\Program Files\MiKTeX 2.9\tex\generic\oberdiek\hobsub-hyperref.sty"
+Package: hobsub-hyperref 2012/04/25 v1.12 Bundle oberdiek, subset hyperref (HO)
+
+
+("C:\Program Files\MiKTeX 2.9\tex\generic\oberdiek\hobsub-generic.sty"
+Package: hobsub-generic 2012/04/25 v1.12 Bundle oberdiek, subset generic (HO)
+Package: hobsub 2012/04/25 v1.12 Construct package bundles (HO)
+Package hobsub Info: Skipping package `infwarerr' (already loaded).
+Package hobsub Info: Skipping package `ltxcmds' (already loaded).
+Package: ifluatex 2010/03/01 v1.3 Provides the ifluatex switch (HO)
+Package ifluatex Info: LuaTeX not detected.
+Package: ifvtex 2010/03/01 v1.5 Detect VTeX and its facilities (HO)
+Package ifvtex Info: VTeX not detected.
+Package: intcalc 2007/09/27 v1.1 Expandable calculations with integers (HO)
+Package: ifpdf 2011/01/30 v2.3 Provides the ifpdf switch (HO)
+Package ifpdf Info: pdfTeX in PDF mode is detected.
+Package: etexcmds 2011/02/16 v1.5 Avoid name clashes with e-TeX commands (HO)
+Package etexcmds Info: Could not find \expanded.
+(etexcmds)             That can mean that you are not using pdfTeX 1.50 or
+(etexcmds)             that some package has redefined \expanded.
+(etexcmds)             In the latter case, load this package earlier.
+Package: kvsetkeys 2012/04/25 v1.16 Key value parser (HO)
+Package: kvdefinekeys 2011/04/07 v1.3 Define keys (HO)
+Package: pdftexcmds 2011/11/29 v0.20 Utility functions of pdfTeX for LuaTeX (HO
+)
+Package pdftexcmds Info: LuaTeX not detected.
+Package pdftexcmds Info: \pdf@primitive is available.
+Package pdftexcmds Info: \pdf@ifprimitive is available.
+Package pdftexcmds Info: \pdfdraftmode found.
+Package: pdfescape 2011/11/25 v1.13 Implements pdfTeX's escape features (HO)
+Package: bigintcalc 2012/04/08 v1.3 Expandable calculations on big integers (HO
+)
+Package: bitset 2011/01/30 v1.1 Handle bit-vector datatype (HO)
+Package: uniquecounter 2011/01/30 v1.2 Provide unlimited unique counter (HO)
+)
+Package hobsub Info: Skipping package `hobsub' (already loaded).
+Package: letltxmacro 2010/09/02 v1.4 Let assignment for LaTeX macros (HO)
+Package: hopatch 2011/06/24 v1.1 Wrapper for package hooks (HO)
+Package: xcolor-patch 2011/01/30 xcolor patch
+Package: atveryend 2011/06/30 v1.8 Hooks at the very end of document (HO)
+Package atveryend Info: \enddocument detected (standard20110627).
+Package: atbegshi 2011/10/05 v1.16 At begin shipout hook (HO)
+Package: refcount 2011/10/16 v3.4 Data extraction from label references (HO)
+Package: hycolor 2011/01/30 v1.7 Color options for hyperref/bookmark (HO)
+)
+("C:\Program Files\MiKTeX 2.9\tex\generic\ifxetex\ifxetex.sty"
+Package: ifxetex 2010/09/12 v0.6 Provides ifxetex conditional
+)
+("C:\Program Files\MiKTeX 2.9\tex\latex\oberdiek\kvoptions.sty"
+Package: kvoptions 2011/06/30 v3.11 Key value format for package options (HO)
+)
+\@linkdim=\dimen118
+\Hy@linkcounter=\count114
+\Hy@pagecounter=\count115
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\pd1enc.def"
+File: pd1enc.def 2012/05/13 v6.82q Hyperref: PDFDocEncoding definition (HO)
+)
+\Hy@SavedSpaceFactor=\count116
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\00miktex\hyperref.cfg"
+File: hyperref.cfg 2002/06/06 v1.2 hyperref configuration of TeXLive
+)
+Package hyperref Info: Hyper figures OFF on input line 4062.
+Package hyperref Info: Link nesting OFF on input line 4067.
+Package hyperref Info: Hyper index ON on input line 4070.
+Package hyperref Info: Plain pages OFF on input line 4077.
+Package hyperref Info: Backreferencing OFF on input line 4082.
+Package hyperref Info: Implicit mode ON; LaTeX internals redefined.
+Package hyperref Info: Bookmarks ON on input line 4300.
+\c@Hy@tempcnt=\count117
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\ltxmisc\url.sty"
+\Urlmuskip=\muskip11
+Package: url 2006/04/12  ver 3.3  Verb mode for urls, etc.
+)
+LaTeX Info: Redefining \url on input line 4653.
+\Fld@menulength=\count118
+\Field@Width=\dimen119
+\Fld@charsize=\dimen120
+Package hyperref Info: Hyper figures OFF on input line 5773.
+Package hyperref Info: Link nesting OFF on input line 5778.
+Package hyperref Info: Hyper index ON on input line 5781.
+Package hyperref Info: backreferencing OFF on input line 5788.
+Package hyperref Info: Link coloring OFF on input line 5793.
+Package hyperref Info: Link coloring with OCG OFF on input line 5798.
+Package hyperref Info: PDF/A mode OFF on input line 5803.
+LaTeX Info: Redefining \ref on input line 5843.
+LaTeX Info: Redefining \pageref on input line 5847.
+\Hy@abspage=\count119
+\c@Item=\count120
+\c@Hfootnote=\count121
+)
+
+Package hyperref Message: Driver (autodetected): hpdftex.
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\hpdftex.def"
+File: hpdftex.def 2012/05/13 v6.82q Hyperref driver for pdfTeX
+\Fld@listcount=\count122
+\c@bookmark@seq@number=\count123
+
+("C:\Program Files\MiKTeX 2.9\tex\latex\oberdiek\rerunfilecheck.sty"
+Package: rerunfilecheck 2011/04/15 v1.7 Rerun checks for auxiliary files (HO)
+Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 2
+82.
+)
+\Hy@SectionHShift=\skip48
+)
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Rep_Scott.aux)
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 26.
+LaTeX Font Info:    ... okay on input line 26.
+
+("C:\Program Files\MiKTeX 2.9\tex\context\base\supp-pdf.mkii"
+[Loading MPS to PDF converter (version 2006.09.02).]
+\scratchcounter=\count124
+\scratchdimen=\dimen121
+\scratchbox=\box31
+\nofMPsegments=\count125
+\nofMParguments=\count126
+\everyMPshowfont=\toks21
+\MPscratchCnt=\count127
+\MPscratchDim=\dimen122
+\MPnumerator=\count128
+\makeMPintoPDFobject=\count129
+\everyMPtoPDFconversion=\toks22
+)
+\c@lstlisting=\count130
+\AtBeginShipoutBox=\box32
+Package hyperref Info: Link coloring OFF on input line 26.
+ ("C:\Program Files\MiKTeX 2.9\tex\latex\hyperref\nameref.sty"
+Package: nameref 2010/04/30 v2.40 Cross-referencing by name of section
+
+("C:\Program Files\MiKTeX 2.9\tex\generic\oberdiek\gettitlestring.sty"
+Package: gettitlestring 2010/12/03 v1.4 Cleanup title references (HO)
+)
+\c@section@level=\count131
+)
+LaTeX Info: Redefining \ref on input line 26.
+LaTeX Info: Redefining \pageref on input line 26.
+LaTeX Info: Redefining \nameref on input line 26.
+
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Rep_Scott.out)
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Rep_Scott.out)
+\@outlinefile=\write4
+
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Rep_Scott.toc)
+\tf@toc=\write5
+
+<figure/Oct_8-1.pdf, id=73, 505.89pt x 505.89pt>
+File: figure/Oct_8-1.pdf Graphic file (type pdf)
+ <use figure/Oct_8-1.pdf>
+Package pdftex.def Info: figure/Oct_8-1.pdf used on input line 44.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+
+[1
+
+{C:/ProgramData/MiKTeX/2.9/pdftex/config/pdftex.map}] [2 <C:/Users/Rudolf/Docum
+ents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_8-1.pdf>]
+<figure/Oct_9-1.pdf, id=97, 505.89pt x 505.89pt>
+File: figure/Oct_9-1.pdf Graphic file (type pdf)
+ <use figure/Oct_9-1.pdf>
+Package pdftex.def Info: figure/Oct_9-1.pdf used on input line 61.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+
+<figure/Oct_9-2.pdf, id=98, 505.89pt x 505.89pt>
+File: figure/Oct_9-2.pdf Graphic file (type pdf)
+ <use figure/Oct_9-2.pdf>
+Package pdftex.def Info: figure/Oct_9-2.pdf used on input line 67.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+
+<figure/Oct_9-3.pdf, id=99, 505.89pt x 505.89pt> [3 <C:/Users/Rudolf/Documents/
+GitHub/scottDataSparseCca/rep_scott/figure/Oct_9-1.pdf>]
+File: figure/Oct_9-3.pdf Graphic file (type pdf)
+
+<use figure/Oct_9-3.pdf>
+Package pdftex.def Info: figure/Oct_9-3.pdf used on input line 73.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+ <figure/Oct_9-4.pdf, id=110, 505.89pt x 505.89pt>
+[4 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_9-
+2.pdf>]
+File: figure/Oct_9-4.pdf Graphic file (type pdf)
+ <use figure/Oct_9-4.pdf>
+Package pdftex.def Info: figure/Oct_9-4.pdf used on input line 79.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+ [5 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_9
+-3.pdf>]
+<figure/oct_10-1.pdf, id=132, 505.89pt x 505.89pt>
+File: figure/oct_10-1.pdf Graphic file (type pdf)
+ <use figure/oct_10-1.pdf>
+Package pdftex.def Info: figure/oct_10-1.pdf used on input line 92.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+
+<figure/oct_10-2.pdf, id=133, 505.89pt x 505.89pt> [6 <C:/Users/Rudolf/Document
+s/GitHub/scottDataSparseCca/rep_scott/figure/Oct_9-4.pdf>]
+File: figure/oct_10-2.pdf Graphic file (type pdf)
+
+<use figure/oct_10-2.pdf>
+Package pdftex.def Info: figure/oct_10-2.pdf used on input line 98.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+ [7 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/oct_1
+0-1.pdf>]
+<figure/Oct_12-1.pdf, id=154, 433.62pt x 433.62pt>
+File: figure/Oct_12-1.pdf Graphic file (type pdf)
+ <use figure/Oct_12-1.pdf>
+Package pdftex.def Info: figure/Oct_12-1.pdf used on input line 114.
+(pdftex.def)             Requested size: 345.0pt x 345.01738pt.
+
+[8 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/oct_10
+-2.pdf>] <figure/Oct_15_1-1.pdf, id=165, 505.89pt x 433.62pt>
+File: figure/Oct_15_1-1.pdf Graphic file (type pdf)
+
+<use figure/Oct_15_1-1.pdf>
+Package pdftex.def Info: figure/Oct_15_1-1.pdf used on input line 125.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Oct_15_1-2.pdf, id=166, 505.89pt x 433.62pt> [9 <C:/Users/Rudolf/Docume
+nts/GitHub/scottDataSparseCca/rep_scott/figure/Oct_12-1.pdf>]
+File: figure/Oct_15_1-2.pdf Graphic file (type pdf)
+
+<use figure/Oct_15_1-2.pdf>
+Package pdftex.def Info: figure/Oct_15_1-2.pdf used on input line 131.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Oct_15_1-3.pdf, id=177, 505.89pt x 433.62pt> [10 <C:/Users/Rudolf/Docum
+ents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_15_1-1.pdf>]
+File: figure/Oct_15_1-3.pdf Graphic file (type pdf)
+
+<use figure/Oct_15_1-3.pdf>
+Package pdftex.def Info: figure/Oct_15_1-3.pdf used on input line 137.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Oct_15_1-4.pdf, id=188, 505.89pt x 433.62pt> [11 <C:/Users/Rudolf/Docum
+ents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_15_1-2.pdf>]
+File: figure/Oct_15_1-4.pdf Graphic file (type pdf)
+
+<use figure/Oct_15_1-4.pdf>
+Package pdftex.def Info: figure/Oct_15_1-4.pdf used on input line 143.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Oct_15_1-5.pdf, id=199, 505.89pt x 433.62pt> [12 <C:/Users/Rudolf/Docum
+ents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_15_1-3.pdf>]
+File: figure/Oct_15_1-5.pdf Graphic file (type pdf)
+
+<use figure/Oct_15_1-5.pdf>
+Package pdftex.def Info: figure/Oct_15_1-5.pdf used on input line 149.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+ [13 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_
+15_1-4.pdf>]
+<figure/Oct_19_Seed-1.pdf, id=221, 505.89pt x 505.89pt>
+File: figure/Oct_19_Seed-1.pdf Graphic file (type pdf)
+
+<use figure/Oct_19_Seed-1.pdf>
+Package pdftex.def Info: figure/Oct_19_Seed-1.pdf used on input line 161.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+ [14 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_
+15_1-5.pdf>]
+<figure/Oct_23_start_micro-1.pdf, id=232, 505.89pt x 433.62pt>
+File: figure/Oct_23_start_micro-1.pdf Graphic file (type pdf)
+
+<use figure/Oct_23_start_micro-1.pdf>
+Package pdftex.def Info: figure/Oct_23_start_micro-1.pdf used on input line 174
+.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+ [15 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_
+19_Seed-1.pdf>]
+<figure/Nov_3_gene_list_and_testing-1.pdf, id=243, 505.89pt x 433.62pt>
+File: figure/Nov_3_gene_list_and_testing-1.pdf Graphic file (type pdf)
+
+<use figure/Nov_3_gene_list_and_testing-1.pdf>
+Package pdftex.def Info: figure/Nov_3_gene_list_and_testing-1.pdf used on input
+ line 186.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Nov_3_gene_list_and_testing-2.pdf, id=244, 505.89pt x 433.62pt>
+[16 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Oct_2
+3_start_micro-1.pdf>]
+File: figure/Nov_3_gene_list_and_testing-2.pdf Graphic file (type pdf)
+ <use figure/Nov_3_gene_list_and_testing-2.pdf>
+Package pdftex.def Info: figure/Nov_3_gene_list_and_testing-2.pdf used on input
+ line 192.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Nov_3_gene_list_and_testing-3.pdf, id=255, 505.89pt x 433.62pt>
+[17 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_3
+_gene_list_and_testing-1.pdf>]
+File: figure/Nov_3_gene_list_and_testing-3.pdf Graphic file (type pdf)
+ <use figure/Nov_3_gene_list_and_testing-3.pdf>
+Package pdftex.def Info: figure/Nov_3_gene_list_and_testing-3.pdf used on input
+ line 198.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+[18 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_3
+_gene_list_and_testing-2.pdf>]
+<figure/Nov_5-1.pdf, id=276, 433.62pt x 433.62pt>
+File: figure/Nov_5-1.pdf Graphic file (type pdf)
+ <use figure/Nov_5-1.pdf>
+Package pdftex.def Info: figure/Nov_5-1.pdf used on input line 209.
+(pdftex.def)             Requested size: 345.0pt x 345.01738pt.
+
+<figure/Nov_5-2.pdf, id=277, 433.62pt x 433.62pt> [19 <C:/Users/Rudolf/Document
+s/GitHub/scottDataSparseCca/rep_scott/figure/Nov_3_gene_list_and_testing-3.pdf>
+]
+File: figure/Nov_5-2.pdf Graphic file (type pdf)
+ <use figure/Nov_5-2.pdf>
+Package pdftex.def Info: figure/Nov_5-2.pdf used on input line 215.
+(pdftex.def)             Requested size: 345.0pt x 345.01738pt.
+ [20 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_
+5-1.pdf>]
+("C:\Program Files\MiKTeX 2.9\tex\latex\listings\lstmisc.sty"
+File: lstmisc.sty 2014/03/04 1.5c (Carsten Heinz)
+\lstFV@gtempboxa=\box33
+) [21 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov
+_5-2.pdf>]
+<figure/Nov_9-1.pdf, id=328, 505.89pt x 433.62pt>
+File: figure/Nov_9-1.pdf Graphic file (type pdf)
+ <use figure/Nov_9-1.pdf>
+Package pdftex.def Info: figure/Nov_9-1.pdf used on input line 257.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+[22 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_9
+-1.pdf>] [23] <figure/Nov_9-2.pdf, id=423, 505.89pt x 433.62pt>
+File: figure/Nov_9-2.pdf Graphic file (type pdf)
+
+<use figure/Nov_9-2.pdf>
+Package pdftex.def Info: figure/Nov_9-2.pdf used on input line 384.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+ [24] [25 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure
+/Nov_9-2.pdf>] [26]
+<figure/Nov_16-1.pdf, id=574, 505.89pt x 433.62pt>
+File: figure/Nov_16-1.pdf Graphic file (type pdf)
+ <use figure/Nov_16-1.pdf>
+Package pdftex.def Info: figure/Nov_16-1.pdf used on input line 486.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+<figure/Nov_16-2.pdf, id=575, 505.89pt x 433.62pt>
+File: figure/Nov_16-2.pdf Graphic file (type pdf)
+ <use figure/Nov_16-2.pdf>
+Package pdftex.def Info: figure/Nov_16-2.pdf used on input line 492.
+(pdftex.def)             Requested size: 345.0pt x 295.71785pt.
+
+[27 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_1
+6-1.pdf>] <figure/Nov_25-1.pdf, id=594, 505.89pt x 505.89pt>
+File: figure/Nov_25-1.pdf Graphic file (type pdf)
+
+<use figure/Nov_25-1.pdf>
+Package pdftex.def Info: figure/Nov_25-1.pdf used on input line 502.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+ <figure/Nov_25-2.pdf, id=595, 505.89pt x 505.89pt>
+[28 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_1
+6-2.pdf>]
+File: figure/Nov_25-2.pdf Graphic file (type pdf)
+ <use figure/Nov_25-2.pdf>
+Package pdftex.def Info: figure/Nov_25-2.pdf used on input line 508.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+
+<figure/Nov_25-3.pdf, id=607, 505.89pt x 505.89pt> [29 <C:/Users/Rudolf/Documen
+ts/GitHub/scottDataSparseCca/rep_scott/figure/Nov_25-1.pdf>]
+File: figure/Nov_25-3.pdf Graphic file (type pdf)
+
+<use figure/Nov_25-3.pdf>
+Package pdftex.def Info: figure/Nov_25-3.pdf used on input line 514.
+(pdftex.def)             Requested size: 345.0pt x 345.00414pt.
+ [30 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_
+25-2.pdf>]
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 529.
+ [31 <C:/Users/Rudolf/Documents/GitHub/scottDataSparseCca/rep_scott/figure/Nov_
+25-3.pdf>]
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 529.
+
+(C:\Users\Rudolf\Documents\GitHub\scottDataSparseCca\rep_scott\Rep_Scott.aux)
+Package atveryend Info: Executing hook `AtVeryEndDocument' on input line 529.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 529.
+Package rerunfilecheck Info: File `Rep_Scott.out' has not changed.
+(rerunfilecheck)             Checksum: 37E53BF9F8BAA24A6144E33F3DBCD773;775.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 529.
+ ) 
+Here is how much of TeX's memory you used:
+ 7581 strings out of 494045
+ 111554 string characters out of 3148384
+ 564340 words of memory out of 3000000
+ 10502 multiletter control sequences out of 15000+200000
+ 7071 words of font info for 26 fonts, out of 3000000 for 9000
+ 715 hyphenation exceptions out of 8191
+ 33i,6n,34p,287b,1766s stack positions out of 5000i,500n,10000p,200000b,50000s
+<C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx10.pfb><C:/Pr
+ogram Files/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmbx12.pfb><C:/Program Fi
+les/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr10.pfb><C:/Program Files/MiKTe
+X 2.9/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/Program Files/MiKTeX 2.9/fon
+ts/type1/public/amsfonts/cm/cmr17.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/
+public/amsfonts/cm/cmti10.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/a
+msfonts/cm/cmti12.pfb><C:/Program Files/MiKTeX 2.9/fonts/type1/public/amsfonts/
+cm/cmtt8.pfb>
+Output written on Rep_Scott.pdf (31 pages, 412857 bytes).
+PDF statistics:
+ 740 PDF objects out of 1000 (max. 8388607)
+ 292 named destinations out of 1000 (max. 500000)
+ 248 words of extra memory for PDF output out of 10000 (max. 10000000)
+

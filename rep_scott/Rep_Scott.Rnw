@@ -1,0 +1,2385 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage[affil-it]{authblk}
+\usepackage{hyperref}
+
+\usepackage{listings} % to add code line break
+\lstset{breaklines=true,showstringspaces=false}
+
+<<setup,include=FALSE>>=
+knitr::opts_chunk$set(message=F,warning=F,results='hold',comment=NA,
+                      fig.align='center',fig.height=7,fig.width=7)
+options(width=60)
+render_listings() 
+# work with "listings" to  to get linebreak in code automatically
+@
+\begin{document}
+
+
+\title{Reproducing Scott's Paper}
+\author{Kejun He}
+\affil{Department of Statistics,\\ Texas A\&M University}
+
+\maketitle
+
+\tableofcontents
+
+\section{Metabolic}
+ \subsection{Oct 8}
+   Reproducing and rearrangeing  \textit{metabolic\_\ignorespaces analysis\_\ignorespaces script.txt}
+   \begin{center}
+<<Oct 8,fig.height=7,fig.width=7,results='hide',echo=FALSE>>=
+#this was just messing around
+metabolic_profile_ex=read.table("../metabolic_profiles/4453348_3_percentID80_cutoff101.txt", 
+stringsAsFactors=TRUE,sep='\t',comment.char="%",quote='"',header=TRUE) #skip=5,nrows=54359,
+names(metabolic_profile_ex)
+summary(metabolic_profile_ex)
+
+
+# this is a new data style..
+# it's a list of data frames. . . weird. counts associated with names and subsets, etc.
+
+sample_filenames=read.table("../metabolic_profiles/sample_filenames.csv", 
+stringsAsFactors=FALSE,sep=',',comment.char="%",quote='"',header=TRUE) #skip=5,nrows=54359,
+
+metabolic_profile_datalist = NULL
+for(f in 1:length(sample_filenames$filename))
+{
+  metabolic_profile_datalist[[f]] = 
+read.table(paste("../metabolic_profiles/",sample_filenames$filename[f],sep=""), 
+stringsAsFactors=TRUE,sep='\t',comment.char="%",quote='"',header=TRUE) #skip=5,nrows=54359,
+}
+
+names(metabolic_profile_datalist[[f]])
+metabolic_profile_datalist[[f]][1:10,]
+
+#This aggregates to the highest level of metabolic profiling
+compressed_datalist = as.list(1:length(sample_filenames$filename))
+for(f in 1:length(sample_filenames$filename))
+{
+  dataset = metabolic_profile_datalist[[f]] 
+	print(dim(dataset)[1])
+
+	data_compressed = matrix(NA,length(levels(dataset$Subsystem.Hierarchy.1)),2)
+	data_compressed[,1] = levels(dataset$Subsystem.Hierarchy.1)
+	#data_compressed
+	for(i in 1:dim(data_compressed)[1])
+	{
+		data_compressed[i,2]=sum(dataset$X..Hits[data_compressed[i,1]==dataset$Subsystem.Hierarchy.1])
+	}
+
+	data_compressed=data.frame(Function= data_compressed[,1],Count= as.numeric(data_compressed[,
+2]))
+	compressed_datalist[[f]] = data_compressed
+}
+names(compressed_datalist[[f]])
+compressed_datalist[[f]][1:10,]
+#output: list of 12 (subject) 
+#each is a data.frame of "Function" and its "Count" in a subject. 
+#They have different dimensions, i.e., different samples can have some microbiome level empty.
+
+
+
+#find out what metabolic functions are there
+#pre step to getting all this data into a single data frame
+level1_functions=NULL
+for(f in 1:length(sample_filenames$filename))
+{
+	#list of all level 1 metabolic functions
+	level1_functions=c(level1_functions, levels(compressed_datalist[[f]][,1]))
+}
+level1_functions=unique(level1_functions) 
+level1_functions
+#"level1" is "Subsystem.Hierarchy.1"
+
+
+#putting the highest level counts into a shared matrix
+
+level1_functions_counts=matrix(0,length(level1_functions),12)
+for(f in 1:length(sample_filenames$filename))
+{
+	for(j in 1:dim(data_compressed)[1])
+	{
+		level1_functions_counts[which(level1_functions==compressed_datalist[[f]][j,1]),f]=compressed_datalist[[f]][j,2] 
+	}
+}
+cbind(level1_functions, level1_functions_counts)
+#not useful. how about:
+rownames(level1_functions_counts)<-level1_functions
+sample_filenames$sample
+
+
+#all the pie charts, now that we've made everything simlar.  
+#name is too long, substring it.
+par(mfrow=c(4,3))
+par(mar=rep(1,4))
+for(f in 1:length(sample_filenames$filename))
+{
+	pie(level1_functions_counts[,f],labels=substr(level1_functions,1,6),main=paste(sample_filenames$sample[f]),cex=.75)
+}
+
+
+#Signiture plots
+rank_order=apply(level1_functions_counts,1,sum)
+sort(rank_order,decreasing = TRUE)
+rank_order=sort(rank_order,decreasing = TRUE,index.return=TRUE)$ix
+#rank_order rank the total counts of level1 from largest counts to smallest
+#rank_order<-order(rank_order,decreasing=T)
+
+#sum of each column:
+total_counts=apply(level1_functions_counts,2,sum)
+total_counts=matrix(rep(total_counts,length(level1_functions)), 
+nrow=length(level1_functions),
+ncol=dim(level1_functions_counts)[2],byrow=TRUE)
+
+level1_functions_percents = level1_functions_counts/total_counts
+#check whether correct: all(apply(level1_functions_percents,2,sum)==1)
+
+@
+   \end{center}
+   The piecharts above show the proportion of each SEEDlevel1 in each individual. 
+  $ $
+  \newpage
+  
+  \subsection{Oct 9}
+  % Reproducing and rearrangeing  \textit{metabolic\_\ignorespaces analysis\_\ignorespaces script.txt}
+   %\vfill
+   \begin{center}
+<<Oct 9, fig.height=7,fig.width=7,echo=FALSE>>=
+
+how_many=1:11
+#how_many=12:27
+
+par(mfrow=c(1,1))
+par(mar=c(18,5,3,1)) #original margin large enough.
+#par(mar=c(6,5,3,1))
+plot(1:length(how_many), (level1_functions_percents[rank_order[how_many],1]),type='l',axes=FALSE,ylim=c(0,.25),
+     ylab="Percent of matched sequences",xlab="",col='blue',
+main="Metabolic Functional Porfile of top 11 SEEDlevel1") 
+for(f in 2:length(sample_filenames$filename))
+{
+  colr='green'
+  llttyy=1
+	if(sample_filenames$Treatment[f]=='FF')
+	{
+		colr='blue'
+		llttyy=2
+	}
+
+	lines(1:length(how_many), (level1_functions_percents)[rank_order[how_many],f],col=colr,lwd=2,lty=llttyy)
+}
+axis(2)
+#axis(1,1:length(how_many),level1_functions[rank_order[how_many]],las=2,cex.axis=.75)
+#how about:
+axis(1,at=1:length(how_many),level1_functions[rank_order[how_many]],las=2,cex.axis=.6)
+legend('top',c("FF","BF"),col=c('blue','green'),lty=c(2,1))
+
+
+par(mar=c(18,5,3,1))
+#par(mar=c(6,5,3,1))
+#Change how_many to length(how_many)
+plot(1:length(how_many), log(level1_functions_percents[rank_order[1:length(how_many)],1]),type='l',axes=FALSE,#ylim=c(-3.5,-1.5),
+xlab="",ylab=expression(log[e]~("percent of matched sequences")),col='blue',
+main="Metabolic Functional Porfile",ylim=c(-5,-1)) 
+for(f in 2:length(sample_filenames$filename))
+{
+	colr='green'
+	if(sample_filenames$Treatment[f]=='FF')
+		colr='blue'
+
+	lines(1:length(how_many), log(level1_functions_percents)[rank_order[1:length(how_many)],f],col=colr,lwd=1)
+}
+axis(2)
+axis(1,at=1:length(how_many),level1_functions[rank_order[1:length(how_many)]],las=2,cex.axis=.5)
+legend('top',c("FF","BF"),fill=c('blue','green'))
+
+
+#PCA:
+how_many=10
+#assign names to make it look clear:
+colnames(level1_functions_counts)<-sample_filenames$sample
+colnames(level1_functions_percents)<-sample_filenames$sample
+XX=(level1_functions_percents[rank_order[1:how_many],])
+
+# this is the standard format -- cols of XX are samples; rows of XX are measures.
+# maybe not
+
+
+# #oh, okay, let's standardize X. . . you gotta do this.
+# tmp_mean=apply(XX,1,mean)
+# XX=XX-matrix(rep(tmp_mean,12),nrow=how_many,ncol=12,byrow=FALSE)
+# 
+# # NOTE THAT WE AREN'T NORMALIZING. SO WE'RE THINKING
+# # MAGNITUDES ARE IMPORTANT. i.e. SMALL % THINGS DON'T MATTER.
+# 
+# dim(XX) 
+# ### X[10x12]=U[10xL]D[LxR]V[12XR]'
+# 
+# # this gives proportions
+# my_1st_SVD = svd(XX,nu=10,nv=12)
+# proportions=(my_1st_SVD$d)^2
+# 
+# par(mfrow=c(1,1))
+# par(mar=c(5,4,3,1))
+# barplot(signif(proportions/sum(proportions),3),
+# names.arg=c("pc","2pc","3pc","4pc","5pc","6pc","7pc","8pc","9pc","10pc"),
+# main="Principal component (pc) proportion of `variation' explained")
+# 
+# 
+# ### this gives top two, so we can look.
+# my_1st_SVD = svd(XX,nu=10,nv=12)
+
+#use R's PCA:
+
+prin_1<-princomp(t(XX))
+prin_perc<-with(prin_1,sdev^2)
+prin_perc<-prin_perc/sum(prin_perc)
+#names(prin_perc)<-paste(rep("pca",10),1:10,sep=".")
+names(prin_perc)<-NULL
+barplot(prin_perc,xlab="pca",ylab="variance proportion",ylim=c(0,0.6),
+     main="10 Princeple Components and their variance proportion",
+#the follwing arguments are new to me:     
+     names.arg=paste(rep("pca",10),1:10,sep="."),cex.names=0.7)
+box()
+
+
+# # I think the following is doing pca socre plots
+# par(mfrow=c(2,2))
+# tmp=t(my_1st_SVD$u)%*%XX
+# x=tmp[1,]
+# y=tmp[2,]
+# plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+# xlab="Principal compoent",
+# ylab="Second principal compoent",pch=19)
+# points(x[7:12],y[7:12],col='blue',pch=19)
+# legend('topleft',c("FF","BF"),fill=c('blue','green'))
+# 
+# x=tmp[1,]
+# y=tmp[3,]
+# plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+# xlab="Principal compoent",
+# ylab="Third principal compoent",pch=19)
+# points(x[7:12],y[7:12],col='blue',pch=19)
+# legend('topleft',c("FF","BF"),fill=c('blue','green'))
+# 
+# x=tmp[2,]
+# y=tmp[3,]
+# plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+# xlab="Second principal compoent",
+# ylab="Third principal compoent",pch=19)
+# points(x[7:12],y[7:12],col='blue',pch=19)
+# legend('topleft',c("FF","BF"),fill=c('blue','green'))
+# 
+# x=tmp[2,]
+# y=tmp[4,]
+# plot(x[1:6],y[1:6],col='green',xlim=c(-.05,.05),ylim=c(-.05,.05),
+# xlab="Second principal compoent",
+# ylab="Fourth principal compoent",pch=19)
+# points(x[7:12],y[7:12],col='blue',pch=19)
+# legend('topleft',c("FF","BF"),fill=c('blue','green'))
+
+
+plot(prin_1$scores[1:6,1],prin_1$scores[1:6,2],xlab="First Component",ylab="Second Component",col="green",ylim=c(-0.04,0.04))
+points(prin_1$scores[7:12,1],prin_1$scores[7:12,2],col="blue")
+legend("topleft",leg=c("BF","FF"),fill=c("green","blue"))
+text(prin_1$scores[,1],prin_1$scores[,2],colnames(level1_functions_counts),pos=3)
+@
+   \end{center}
+
+  \subsection{Oct 10}
+   Reproducing and rearrangeing \textit{metabolic\_\ignorespaces analysis\_\ignorespaces script.txt}
+   \begin{center}
+<<oct 10,fig.height=7,fig.width=7,echo=FALSE>>=
+#tmp=cor(t(rbind(XX,tmp[1:4,])))
+#diag(tmp)=seq(1,-1,-2/13) #no sense
+
+tmp<-cor(cbind(t(XX),prin_1$scores[,1:4]))
+par(mfrow=c(1,1))
+par(mar=c(16,16,4,2))
+image(1:14,1:14,tmp,axes=FALSE,xlab="",ylab="",
+main="Original Basis and Principal Component Correlations",col=terrain.colors(14))
+lines(c(10.5,10.5),c(0,15),lwd=3)
+abline(10.5,0,lwd=3)
+#colrs=seq(1,-1,-2/13) #no sense
+colrs=rep(1,14)
+for(i in 1:14)
+{
+  text(i,i,signif(colrs[i],2)) #no sense
+}
+axis(1,1:14,
+c(level1_functions[rank_order[1:how_many]],"PC","2PC","3PC","4PC"),
+las=2,cex.axis=.75)
+axis(2,1:14,
+c(level1_functions[rank_order[1:how_many]],"PC","2PC","3PC","4PC"),
+las=2,cex.axis=.75)
+
+
+#reduction=rep(0,length(level1_functions))
+#for(i in 1:length(level1_functions))
+#{
+#  reduction[i]=sum(level1_functions[i]==c("Carbohydrates", "Virulence", "Cell Wall and Capsule", "RNA Metabolism"))
+#}
+
+how_many=4
+pick_how_many<-c("Carbohydrates", "Virulence", "Cell Wall and Capsule", "RNA Metabolism")
+
+
+par(mfrow=c(1,1))
+par(mar=c(8,5,3,1))
+plot(1:how_many, level1_functions_percents[which(rownames(level1_functions_percents) %in% pick_how_many),1],type='l',ylim=c(0,.2),axes=FALSE,lty=3, xlab="",ylab="Percent of matched sequences",main="Metabolic Functional Porfile of concerned 4 SEEDlevel1")
+
+#plot(1:how_many, level1_functions_percents[1==reduction,1],type='l',ylim=c(0,.2),axes=FALSE,lty=3, xlab="",ylab="Percent of matched sequences",main="Metabolic Functional Porfile") 
+#Kejun Changes it, see above
+
+
+for(f in 2:length(sample_filenames$filename))
+{
+  colr='green'
+	ltype=1
+	if(sample_filenames$Treatment[f]=='FF')
+	{
+		colr='blue'
+		ltype=3
+	}
+
+	lines(1:how_many, level1_functions_percents[which(rownames(level1_functions_percents) %in% pick_how_many),f], col=colr,lwd=2,lty=ltype)
+}
+axis(2)
+axis(1,1:how_many,level1_functions[which(rownames(level1_functions_percents) %in% pick_how_many)],las=2,cex.axis=.75)
+legend('top',c("FF","BF"),fill=c('blue','green'))
+@
+   \end{center}
+   
+   
+  \subsection{Oct 12}
+stop at line 410.
+scotts\_\ignorespaces Immunology\_\ignorespaces set is on CCA part (around the end) of ``paper\_\ignorespaces figure\_\ignorespaces analysis.txt''. 
+
+  
+<<Oct 12, fig.height=6,fig.width=6,echo=FALSE,results='hide'>>=  
+# this is how I got the tables and figures in the manuscript.
+
+# 1) There's an excel sheet called "tasks-1.xlsx" that lists the number of reads in each sample
+
+# we gotta get the proportion of all reads overall
+# so this little bit counts the number of assigned things 
+
+#I find stacked_data from "Metabolic_analysis"
+stacked_data = 
+rbind(
+data.frame("id"=sample_filenames$sample[1], metabolic_profile_datalist[[1]]),
+data.frame("id"=sample_filenames$sample[2], metabolic_profile_datalist[[2]]),
+data.frame("id"=sample_filenames$sample[3], metabolic_profile_datalist[[3]]),
+data.frame("id"=sample_filenames$sample[4], metabolic_profile_datalist[[4]]),
+data.frame("id"=sample_filenames$sample[5], metabolic_profile_datalist[[5]]),
+data.frame("id"=sample_filenames$sample[6], metabolic_profile_datalist[[6]]),
+data.frame("id"=sample_filenames$sample[7], metabolic_profile_datalist[[7]]),
+data.frame("id"=sample_filenames$sample[8], metabolic_profile_datalist[[8]]),
+data.frame("id"=sample_filenames$sample[9], metabolic_profile_datalist[[9]]),
+data.frame("id"=sample_filenames$sample[10], metabolic_profile_datalist[[10]]),
+data.frame("id"=sample_filenames$sample[11], metabolic_profile_datalist[[11]]),
+data.frame("id"=sample_filenames$sample[12], metabolic_profile_datalist[[12]]))
+
+names(stacked_data)
+the_samples=unique(stacked_data$id)
+length(unique(stacked_data$Subsystem.Hierarchy.2))
+
+number_SEED_hits = 1:12
+for(i in 1:12)
+{
+  number_SEED_hits[i] = sum(stacked_data$X..Hits[stacked_data$id==the_samples[i]]) 
+}
+
+
+# 2) Phylum information was gotten like this, and plotted like this
+# 2) Phylum information was gotten like this, and plotted like this
+# 2) Phylum information was gotten like this, and plotted like this
+# 2) Phylum information was gotten like this, and plotted like this
+# 2) Phylum information was gotten like this, and plotted like this
+
+
+iddo_phylum_counts=read.table("../sequencing_phylum_data.csv", stringsAsFactors=FALSE,skip=3,nrows=12,sep=',',comment.char="#", header=TRUE)
+
+names(iddo_phylum_counts)
+# [1] "Chapkin_Id"        "MG_Rast_Id"        "Group"            
+# [4] "Firmicutes"        "Actinobacteria"    "Proteobacteria"   
+# [7] "Bacteroidetes"     "Verrucomicrobia"   "Un_sub_classified"
+# [10] "Classified"        "Unclassified"     
+
+# this was just a qc check.. . make sure we've actually got the right stuff.
+iddo_phylum_FF_count_sum = apply(iddo_phylum_counts[iddo_phylum_counts$Group=='FF', 4:8],2,sum,na.rm=TRUE)
+iddo_phylum_BF_count_sum = apply(iddo_phylum_counts[iddo_phylum_counts$Group=='BF', 4:8],2,sum,na.rm=TRUE)
+
+iddo_phylum_percents = iddo_phylum_counts[, 1:9]
+iddo_phylum_percents[,4:9] = iddo_phylum_counts[,4:9]/apply(iddo_phylum_counts[,4:9],1,sum,na.rm=TRUE)  
+#dim(iddo_phylum_counts) is 12 11
+#so apply(,1,sum) is sum of all phylum in each individual. 
+
+par(mfrow=c(2,1))
+
+#####we don't need to output the following :
+# postscript("~/Desktop/ChapkinLab/meta_host_paper/high_dpi_images/phylum1.eps",horizontal=FALSE,width=7,height=3.5,onefile=FALSE) 
+
+par(mar=c(4,4,2,2))
+
+boxplot(iddo_phylum_percents$Firmicutes[1:6],at=1.25,xlim=c(1,10),ylim=c(0,.9),col="blue",
+ylab="Proportion")
+boxplot(iddo_phylum_percents$Firmicutes[7:12],at=1.75,xlim=c(1,10),add=TRUE,col="green",axes=FALSE)
+boxplot(iddo_phylum_percents$Actinobacteria[1:6],at=3.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue",axes=FALSE)
+boxplot(iddo_phylum_percents$Actinobacteria[7:12],at=3.75,xlim=c(1,10),add=TRUE,col="green",axes=FALSE)
+boxplot(iddo_phylum_percents$Proteobacteria[1:6],at=5.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue",axes=FALSE)
+boxplot(iddo_phylum_percents$Proteobacteria[7:12],at=5.75,xlim=c(1,10),add=TRUE,col="green",axes=FALSE)
+boxplot(iddo_phylum_percents$Bacteroidetes[1:6],at=7.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue",axes=FALSE)
+boxplot(iddo_phylum_percents$Bacteroidetes[7:12],at=7.75,xlim=c(1,10),add=TRUE,col="green",axes=FALSE)
+boxplot(iddo_phylum_percents$Verrucomicrobia[1:6],at=9.25,xlim=c(1,10),add=TRUE,ylim=c(0,.9),col="blue",axes=FALSE)
+boxplot(iddo_phylum_percents$Verrucomicrobia[7:12],at=9.75,xlim=c(1,10),add=TRUE,col="green",axes=FALSE)
+axis(1,seq(1.5,9.5,2),names(iddo_phylum_percents)[4:8],las=1,cex.axis=.65)
+legend("topright",legend=c("FF","BF"),fill=c("blue","green"),border=c("black","black"),cex=0.6)
+title("Phylogenetic Distribution of sequencing_phylum_data.csv")
+
+#dev.off()
+
+FF_stat = iddo_phylum_percents[1:6,4:9]
+rownames(FF_stat)=iddo_phylum_percents$Chapkin_Id[1:6]
+BF_stat = iddo_phylum_percents[7:12,4:9]
+rownames(BF_stat)=iddo_phylum_percents$Chapkin_Id[7:12]
+FF_stat=FF_stat*log(FF_stat)
+BF_stat=BF_stat*log(BF_stat)
+
+observed_test_stat_FF = mean(apply(FF_stat,1,sum,na.rm=TRUE)) 
+#mean of all phylum in each FF
+
+observed_test_stat_BF = mean(apply(BF_stat,1,sum,na.rm=TRUE))
+#mean of all phylum in each BF
+
+####we don't need to output the picture:
+#postscript("~/Desktop/ChapkinLab/meta_host_paper/high_dpi_images/phylum2.eps",horizontal=FALSE,width=7,height=3.5,onefile=FALSE) 
+
+plot(sort(-apply(FF_stat,1,sum,na.rm=TRUE)),type="p",col="blue",ylim=c(.5,1.6),cex=3,
+     axes=FALSE,main="Shannon index of diversity", ylab="Diversity score H",pch=16,
+     xlab="BF and FF samples sorted by H")
+text(x=1:6,y=sort(-apply(FF_stat,1,sum,na.rm=TRUE)),labels=rownames(FF_stat)[order(-apply(FF_stat,1,sum,na.rm=TRUE))])
+points(sort(-apply(BF_stat,1,sum,na.rm=TRUE)),col="green",pch=17,cex=3)
+text(x=1:6,y=sort(-apply(BF_stat,1,sum,na.rm=TRUE)),labels=rownames(BF_stat)[order(-apply(BF_stat,1,sum,na.rm=TRUE))])
+axis(1,1:6,rep("",6))
+axis(2)
+legend("topleft",legend=c("FF"),col=c("blue"),border=c("blue"),pch=c(16),cex=0.7)
+legend("bottomright",legend=c("BF"),col=c("green"),border=c("green"),pch=c(17),cex=0.7)
+
+#legend("topleft",legend=c("FF","BF"),col=c("blue","green"),border=c("blue","green"),pch=c(16,17),cex=1.1)
+
+
+#dev.off()
+
+# 3) The SEED level 1 metabolic function characteristics were gotten like this, and plotted like this
+# 3) The SEED level 1 metabolic function characteristics were gotten like this, and plotted like this
+# 3) The SEED level 1 metabolic function characteristics were gotten like this, and plotted like this
+# 3) The SEED level 1 metabolic function characteristics were gotten like this, and plotted like this
+# 3) The SEED level 1 metabolic function characteristics were gotten like this, and plotted like this
+
+# SEED1
+# just some DE tests now:
+# top level 
+SEEDlevel1=unique(stacked_data$Subsystem.Hierarchy.1)
+data_counts = matrix(0,nrow=length(SEEDlevel1), ncol=12)
+for(s in 1:length(SEEDlevel1))
+{
+  
+  for(i in 1:12)
+	{
+		data_counts[s,i]=sum(stacked_data[stacked_data$Subsystem.Hierarchy.1==SEEDlevel1[s] & stacked_data$id==the_samples[i], 5])
+	}
+}
+data_percents = t(t(data_counts)/apply(data_counts,2,sum))
+apply(data_percents,2,sum,Na.rm=T)
+
+
+iddo_LEVEL_1_percents = data.frame(data_percents) 
+# above percent is the percent of each seedlevel1 in one subject
+
+
+names(iddo_LEVEL_1_percents) = the_samples
+#iddo_LEVEL_1_counts = data.frame(SEED1_average_read_count) 
+iddo_LEVEL_1_counts = data.frame(data_counts)
+names(iddo_LEVEL_1_counts) = the_samples
+
+#####may not be needed:
+#write.table(data.frame(SEEDlevel1, iddo_LEVEL_1_percents, iddo_LEVEL_1_counts) , "~/Desktop/ChapkinLab/Iddo/iddo_SEED_LEVEL_1.txt", sep='\t', row.names=FALSE)
+
+#instead, kejun does:
+SEED1_put_out<-data.frame(SEEDlevel1, iddo_LEVEL_1_percents, iddo_LEVEL_1_counts)
+
+
+
+if(1==0) # looking at read counts .. not all stuff mapped
+{
+	tmp=apply(data_counts,2,sum)
+	par(mfrow=c(1,1))
+	plot(1:6, tmp[1:6], main="Sequencing depth", col='green', ylab="total mapped reads", xlab="", xlim=c(1,12), axes=FALSE)
+	axis(2)
+	axis(1, 1:12, the_samples)
+	points(7:12, tmp[7:12], main="FF", col='blue', xlab="total mapped reads")
+	legend('topleft', c("BF", "FF"), fill=c("green","blue"),cex=.65) 
+
+	par(mfrow=c(1,2))
+	hist(c(data_counts[,1:6]), breaks=seq(0,9000,250), main="BF SEED 1 categories", xlab="read counts")
+	hist(c(data_counts[,7:12]), breaks=seq(0,9000,250), main="FF SEED 1 categories", xlab="read counts")
+
+par(mfrow=c(1,2))
+hist( stacked_data$X..Hits[substr(stacked_data$id,1,1) == "B"], breaks=c(seq(1,1000,25),6000),xlim=c(0,500),
+main="BF SEED 3 categories", xlab="read counts")
+hist( stacked_data$X..Hits[substr(stacked_data$id,1,1) == "F"], breaks=c(seq(1,1000,25),6000),xlim=c(0,500),
+main="FF SEED 3 categories", xlab="read counts")
+
+read_counts_2nd = NULL
+for(i in 7:12){ #1:6)
+  for(s in 1:length(SEEDlevel1)){
+
+    SEEDlevel2 = unique(stacked_data$Subsystem.Hierarchy.2[stacked_data$id == the_samples[i] & 
+		stacked_data$Subsystem.Hierarchy.1 == SEEDlevel1[s] ] ) 
+
+    for(ss in 1:length(SEEDlevel2)){
+	    read_counts_2nd = c(read_counts_2nd, sum(stacked_data$X..Hits[
+	    stacked_data$id == the_samples[i] & 
+  	  stacked_data$Subsystem.Hierarchy.1 == SEEDlevel1[s] & 
+  	  stacked_data$Subsystem.Hierarchy.2 == SEEDlevel2[ss] ] ) )
+    }
+  }
+}
+hist(read_counts_2nd)
+#bf_read_counts_2nd=read_counts_2nd
+#ff_read_counts_2nd=read_counts_2nd
+
+hist(bf_read_counts_2nd, main="BF SEED 2 categories", xlab="read counts", xlim=c(0, 1500), breaks=c(seq(0,1500,100),6000) )
+hist(ff_read_counts_2nd, main="FF SEED 2 categories", xlab="read counts", xlim=c(0, 1500), breaks=c(seq(0,1500,100),6000) )
+
+
+}
+@
+
+  \subsection{Oct 15}
+  
+<< Oct 15 1,fig.width=7,fig.height=6,results='hide',echo=FALSE>>=
+# this is supposed to be a better representation of the SEED level 1
+
+#ranked_order = sort(apply(data_percents,1,mean),index.return=TRUE,decreasing=TRUE)$ix
+ranked_order=order(apply(data_percents,1,mean),decreasing=T)
+#apply(data_percents,2,sum) will get 12 1's.
+#Now data_percents is each SEEDlevel1 in each individual, each column is one baby.
+
+ordered_data_percents = data_percents[ranked_order,]
+
+#postscript("~/Desktop/ChapkinLab/meta_host_paper/high_dpi_images/function1.eps",horizontal=FALSE,width=16,height=6,onefile=FALSE) 
+#par(mar=c(4,4,2,2))
+
+par(mfrow=c(1,1))
+par(mar=c(17,4,3,2))
+boxplot(ordered_data_percents[1,7:12],at=.8,xlim=c(1,27),ylim=c(0,.21),col="blue",
+ylab="Proportion")
+boxplot(ordered_data_percents[1,1:6],at=1.2,add=TRUE,col="green",axes=FALSE)
+for(i in 2:dim(ordered_data_percents)[1])
+{
+  boxplot(ordered_data_percents[i,7:12],at=i-.2,xlim=c(1,27),ylim=c(0,.21),col="blue",
+add=TRUE,axes=FALSE)
+  boxplot(ordered_data_percents[i,1:6],at=i+.2,add=TRUE,col="green",axes=FALSE)
+}
+axis(1,1:27,as.character(SEEDlevel1)[ranked_order],las=2,cex.axis=.85)
+legend("topright",legend=c("FF","BF"),fill=c("blue","green"),border=c("black","black"))
+title("SEED level 1  Metabolic Function Composition")
+
+#dev.off()
+
+
+DE_tests_SEED1 = 1:length(SEEDlevel1)
+DE_tests_stats_SEED1 = 1:length(SEEDlevel1)
+#perms=10000-1
+perms=1000-1
+test_stats=1:perms
+
+#start permutation test
+set.seed(1015)
+for(s in 1:length(SEEDlevel1))
+{
+	for(pp in 1:perms)
+	{
+		#tmp = sample(1:12,12)
+    tmp<-sample(1:12,12,replace=F)
+		tmp = data_percents[s,tmp]
+
+		test_stats[pp] = abs(mean(tmp[1:6]) - mean(tmp[7:12]))
+	}
+	DE_tests_SEED1[s] = (1+sum(
+abs(mean(data_percents[s,1:6]) - mean(data_percents[s,7:12])) <= test_stats))/(1+perms)	
+DE_tests_stats_SEED1[s] = mean(data_percents[s,1:6]) - mean(data_percents[s,7:12])
+}
+#out of permutation test, test for each SEEDlevel1, whether the BF and FF are different. 
+#DE_tests_SEED1 (length=27) returns the p-value and DE_tests_stats_SEED1 (length=27) returns the test statistic
+
+
+names(DE_tests_SEED1)=SEEDlevel1
+#sort(DE_tests_SEED1)
+#plot(DE_tests_stats_SEED1,axes=F,col="red",type="p",pch=16,xlab="")
+#they may wanna:
+plot(sort(DE_tests_stats_SEED1,decr=T),axes=F,col="red",type="p",pch=16,xlab="",ylab="p-value")
+axis(2)
+axis(1,1:length(SEEDlevel1),SEEDlevel1,las=2,cex.axis=0.5)
+title("SEEDlevel_1 permutation test results for each gene")
+
+
+#SEEDlevel1<-as.character(SEEDlevel1)
+put_out = cbind(DE_tests_SEED1, DE_tests_stats_SEED1, data_counts,data_percents)
+put_out = data.frame(put_out)
+put_out= cbind(SEEDlevel1,put_out)
+names(put_out) = c("SEED1","perm_pvalue","BF_SEED1_ave-FF_SEED1_ave",as.character(the_samples),as.character(the_samples))
+
+#write.table(put_out, "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED1_DE.txt",
+#sep='\t', col.names=TRUE,row.names=FALSE)
+
+#put_out=read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED1_DE.txt",
+#sep='\t', header=TRUE)
+
+
+#####Original line 251- line 280 don' look reasonable: skip from this markdown
+
+
+
+# so, we're trying to limit what we're testing here
+# let's do two cut offs. .
+# 
+head(sort(DE_tests_SEED1[apply(data_percents > .015,1,sum)==12 & apply(data_counts > 100,1,sum)==12]))
+
+#qvalue/p.adjust:no definition
+#qvalue/p.adjust:no definition
+#qrcents > .015,1,sum)==12 & apply(data_counts > 100,1,sum)==12]))$q
+#p.adjust(sort(DE_tests_SEED1[apply(data_value(sort(DE_tests_SEED1[apply(data_pepercents > .015,1,sum)==12 & apply(data_counts > 100,1,sum)==12]),method="fdr")
+
+
+
+
+# 4) The SEED level 2 metabolic function characteristics were gotten like this, and plotted like this
+# 4) The SEED level 2 metabolic function characteristics were gotten like this, and plotted like this
+# 4) The SEED level 2 metabolic function characteristics were gotten like this, and plotted like this
+# 4) The SEED level 2 metabolic function characteristics were gotten like this, and plotted like this
+
+
+#the top level
+# actually, more like this is SEED level 2 stuff
+# I guess we're seeing what SEED level 1 stuff varies as a whole 
+# in seed level 2
+SEEDlevel1=unique(stacked_data$Subsystem.Hierarchy.1)
+matrix(0,nrow=length(SEEDlevel1), ncol=12)
+
+#the second level
+level2_chisq.test.outputs = 1:length(SEEDlevel1)
+bf_ff_permutation_test = 1:length(SEEDlevel1)
+names(level2_chisq.test.outputs) = SEEDlevel1
+
+# differential testing on a per unit basis:
+DE_tests_SEED2 = NULL
+test_stats_values=NULL
+test_stats_data=NULL
+
+set.seed(1016)
+# There are permutation test inside the loop. 
+for(s in 1:length(SEEDlevel1))
+  {
+
+  first_level_choice= SEEDlevel1[s] #for example, just choosing this one for now
+  SEEDlevel2=unique(stacked_data$Subsystem.Hierarchy.2[stacked_data$Subsystem.Hierarchy.1==first_level_choice]) #Seedlevel2 of given level1
+
+  data_counts = matrix(0,nrow=length(SEEDlevel2), ncol=12)
+
+  for(i in 1:12)
+    for(j in 1:length(SEEDlevel2)){
+      data_counts[j,i]=sum(stacked_data$X..Hits[
+      stacked_data$Subsystem.Hierarchy.1==first_level_choice
+      & 
+      stacked_data$id==the_samples[i]
+      &
+      stacked_data$Subsystem.Hierarchy.2 == SEEDlevel2[j]
+      ])
+    }
+
+  level2_chisq.test.outputs[s] = chisq.test(data_counts)$p.value
+
+# first 6 samples are BF . second 6 are FF
+# this makes the null distribution of permuting labels
+# testing curves versus curves
+# another way to do this is to just test each level individually.. i'm gonna try 
+# that way
+
+# i guess i don't like full curve testing because it's dominated too much by big percentage categories..
+# well.. actually, i guess that's a plus when it's the big categories that are driving the differences..
+# which would be the most interesting case . 
+
+  if(1==0)#I don't want to do this it takes too long. this is aparently doing curve testing
+  {
+
+    bf_ff_permutation_test[s] = NA
+    if(dim(data_counts)[1]>1)
+    {
+      null_dist = 1:9999#yikes, add 1 more 9 and this thing takes forever!
+      for(perm in 1:9999)
+      {
+	      the_new_bf = sample(1:12,6)
+	      the_new_ff = setdiff(1:12, the_new_bf)
+	      # columns are samples
+	      # rows are categories
+	      t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum))
+	      the_new_ff_ave = apply(t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum)),1,mean)
+
+	      t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum))
+	      the_new_bf_ave = apply(t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum)),1,mean)
+
+	      null_dist[perm] = sum(abs(the_new_ff_ave - the_new_bf_ave))
+
+	      #hist(null_dist[1:perm])
+      }
+      the_new_bf = 1:6
+      the_new_ff = 7:12
+      # columns are samples
+      # rows are categories
+      t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum))
+      the_new_ff_ave = apply(t(t(data_counts[,the_new_ff])/apply(data_counts[,the_new_ff], 2, sum)),1,mean)
+      t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum))
+      the_new_bf_ave = apply(t(t(data_counts[,the_new_bf])/apply(data_counts[,the_new_bf], 2, sum)),1,mean)
+
+      bf_ff_permutation_test[s] = sum(sum(abs(the_new_ff_ave - the_new_bf_ave))<=null_dist)/(length(null_dist)+1)
+    }
+
+
+
+#postscript(paste("~/Desktop/ChapkinLab/Iddo/SEED_level_2/", first_level_choice,".ps",sep=""), horizontal=FALSE,width=5,height=8)
+    par(mar=c(20,5,5,5))
+    plot(data_counts[,1]/sum(data_counts[,1]),type='l',ylim=c(0,1),axes=FALSE,xlab="",ylab="")
+    title(first_level_choice)
+    for(i in 1:length(the_samples))
+    {
+	    colr='green'
+	    if(i > 6)
+	    {
+		    colr='blue'
+	    }	
+	    lines(data_counts[,i]/sum(data_counts[,i]),col=colr)
+    }
+    axis(2)
+    axis(1, 1:length(SEEDlevel2), as.character(SEEDlevel2), las=2,cex.axis=.75)
+    legend('top', c("BF","FF"), fill=c('green','blue')) 
+     #dev.off()
+
+  }#end (1==0) if to not do this.. from the complaint above that this is too long 
+
+  data_percents = t(t(data_counts)/apply(data_counts,2,sum))
+  apply(data_percents,2,sum)
+
+ # perms=10000-1
+  perms=1000-1
+  test_stats=1:perms
+
+#DE_tests_SEED2=NULL 
+#test_stats_values=NULL
+#test_stats_data=NULL
+  for(ss in 1:length(SEEDlevel2))
+  {
+    DE_tests_SEED2 = c(DE_tests_SEED2, NA)
+    names(DE_tests_SEED2)[length(DE_tests_SEED2)] = paste(SEEDlevel1[s], "-",SEEDlevel2[ss])
+#that's reason that DE_tests_SEED2 has 162 observation, while # of SEEDlevel2 has only 157.
+	  for(pp in 1:perms)
+	  {
+		  tmp = sample(1:12,12)
+		  tmp = data_percents[ss,tmp]		
+		  test_stats[pp] = abs(mean(tmp[1:6],na.rm=T) - mean(tmp[7:12],na.rm=T))
+	  } # out of permutation test the difference of their mean
+	  DE_tests_SEED2[length(DE_tests_SEED2)] = (1+sum(
+    abs(mean(data_percents[ss,1:6],na.rm=T) - mean(data_percents[ss,7:12],na.rm=T)) <= test_stats))/(1+perms)	# test BF!=FF
+
+	  tmp = data_percents[ss,1:12]
+	  test_stats_values = c(test_stats_values, mean(tmp[1:6],na.rm=T) - mean(tmp[7:12],na.rm=T))
+	  test_stats_data = rbind(test_stats_data, c(data_counts[ss,], data_percents[ss,])) 
+  }#out of (ss in 1:length(SEEDlevel2))
+}#out of (s in 1:length(SEEDlevel1)
+
+# these ones here are for the thing right below,
+# which is finding the overall proportion of reads in these things 
+#t(t(test_stats_data[,1:12])/number_SEED_hits)
+#(test_stats_data[162,1:12])/number_SEED_hits
+
+# we gotta get the proportion of all reads overall
+# so this little bit counts the number of assigned things 
+number_SEED_hits = 1:12
+for(i in 1:12)
+{
+	number_SEED_hits[i] = sum(stacked_data$X..Hits[stacked_data$id==the_samples[i]]) 
+}
+
+DE_tests_SEED2_names = names(DE_tests_SEED2)
+SEED2_individual_DEtests = data.frame(DE_tests_SEED2_names, as.numeric(DE_tests_SEED2), test_stats_values, test_stats_data,t(t(test_stats_data[,1:12])/number_SEED_hits)) # # of variables:1+1+1+24+12=39
+names(SEED2_individual_DEtests) = c("category", "permutation_test", "BF-FF", as.character(the_samples),as.character(the_samples),as.character(the_samples))
+
+#write.table(SEED2_individual_DEtests, "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED2_DE2.txt", sep='\t', col.names=TRUE)
+hist(DE_tests_SEED2,main="permutation test p-values for all SEEDlevel2",breaks=12,ylab="density of pvalues",
+     xlab="SEEDlevel2")
+ 
+
+# here, we just download what we processed..
+# so, now, we're gonna do our nunber of reads too small check.
+
+
+SEED2_put_out = SEED2_individual_DEtests
+#read.table("../Metabolic_Profile_SEED2_DE2.txt", sep='\t', header=TRUE)
+  
+#names(SEED2_put_out)
+#dim(SEED2_put_out)
+
+DE_tests_SEED2_names = SEED2_put_out[,1]
+DE_tests_SEED2 = SEED2_put_out[,2]
+test_stats_values = SEED2_put_out[,3]
+SEED2_number_reads = SEED2_put_out[,4:(4+11)] 
+SEED2_relative_percent = SEED2_put_out[,16:(16+11)] 
+SEED2_overal_percent = SEED2_put_out[,28:(28+11)] 
+
+
+good_enough_depth = 
+(apply(SEED2_number_reads[1:6]>100,1,sum)==6 | apply(SEED2_number_reads[7:12]>100,1,sum)==6 ) & 
+(apply(SEED2_overal_percent[1:6]>.005,1,sum)==6 | apply(SEED2_overal_percent[7:12]>.005,1,sum)==6)
+sum(good_enough_depth)
+
+head(DE_tests_SEED2_names[good_enough_depth])
+head(DE_tests_SEED2[good_enough_depth])
+
+
+# here, we're gonna show the picture of virulence characteristics
+
+virulence_ones = grep("Virulence", DE_tests_SEED2_names)
+#a good one to capture the patten in the names
+cbind(DE_tests_SEED2_names[virulence_ones],DE_tests_SEED2[virulence_ones], SEED2_relative_percent[virulence_ones,])
+
+#postscript("~/Desktop/ChapkinLab/meta_host_paper/high_dpi_images/function2.eps",horizontal=FALSE,width=16,height=6,onefile=FALSE) 
+par(mar=c(6,4,2,2))
+#par(mar=c(17,4,3,2))
+
+boxplot(t(SEED2_relative_percent[virulence_ones[1],7:12]), at=.8, ylim=c(0,.8), xlim=c(1,length(virulence_ones)),col="blue",ylab="Proportion")
+boxplot(t(SEED2_relative_percent[virulence_ones[1],1:6]), at=1.2, col="green",add=TRUE,axes=FALSE)
+for(i in 2:length(virulence_ones))
+{
+  boxplot(t(SEED2_relative_percent[virulence_ones[i],7:12]), at=i-.2, col="blue",add=TRUE,axes=FALSE)
+	boxplot(t(SEED2_relative_percent[virulence_ones[i],1:6]), at=i+.2, col="green",add=TRUE,axes=FALSE)	
+}
+axis(1,1:length(virulence_ones),abbreviate(as.character(DE_tests_SEED2_names)[virulence_ones],minlength=13),las=2,cex.axis=.55)
+#remember abbreviate() please.
+legend("topright",legend=c("FF","BF"),fill=c("blue","green"),border=c("black","black"))
+title("Virulence SEED level 2  Metabolic Function Composition")
+
+#dev.off()
+
+
+dim(SEED2_number_reads)
+# 162 seed 2 categories
+
+sum(apply(SEED2_number_reads>100,1,sum)==12)
+# 32 have read counts greater than 100 for all 12 samples
+
+good_enough_depth = apply(SEED2_number_reads>100,1,sum)==12 & apply(SEED2_overal_percent>.005,1,sum)==12
+sum(apply(SEED2_number_reads>100,1,sum)==12 & apply(SEED2_overal_percent>.005,1,sum)==12)
+# 28 also have at least half a percent depth for all 12 samples
+
+DE_tests_SEED2_names[good_enough_depth]
+DE_tests_SEED2[good_enough_depth]
+
+#hist(p.adjust(DE_tests_SEED2[good_enough_depth],method="fdr"),main="FDR controlled p-value adjustment of SEEDlevel3",xlab="adjusted p",ylab="counts")
+
+hist(p.adjust(DE_tests_SEED2,method="fdr"),main="FDR controlled p-value adjustment of SEEDlevel2",
+     xlab="adjusted p",ylab="counts")
+
+@
+
+
+  \subsection{Oct 19}
+   Seedlevel3
+<<Oct 19 Seed,echo=FALSE,results='hide'>>=
+# 5) The SEED level 3 metabolic function characteristics.. we're just reporting that the depth is weak
+# 5) The SEED level 3 metabolic function characteristics.. we're just reporting that the depth is weak
+# 5) The SEED level 3 metabolic function characteristics.. we're just reporting that the depth is weak
+# 5) The SEED level 3 metabolic function characteristics.. we're just reporting that the depth is weak
+# 5) The SEED level 3 metabolic function characteristics.. we're just reporting that the depth is weak
+# so this whole section is just about reporting the depth limitations we have in our analysis. 
+
+
+
+#put_out=read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED1_DE.txt", sep='\t', header=TRUE)
+
+#based on {Oct 12}
+
+SEEDlevel1= put_out[,1]
+DE_tests_SEED1 = put_out[,2]
+DE_tests_stats_SEED1 = put_out[,3]
+data_counts = put_out[,4:(4+11)]
+data_percents = put_out[,16:(16+11)]
+
+SEED1_average_read_count = apply(data_counts, 1, mean)
+
+sum(
+c(
+sum(SEED1_average_read_count<10)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=10 & SEED1_average_read_count<100)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=100 & SEED1_average_read_count<200)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=200 & SEED1_average_read_count<500)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=500 & SEED1_average_read_count<1000)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=1000)/length(SEED1_average_read_count)
+)
+)
+
+signif(
+c(
+sum(SEED1_average_read_count<10)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=10 & SEED1_average_read_count<100)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=100 & SEED1_average_read_count<200)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=200 & SEED1_average_read_count<500)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=500 & SEED1_average_read_count<1000)/length(SEED1_average_read_count),
+sum(SEED1_average_read_count>=1000)/length(SEED1_average_read_count)
+), 2)
+
+
+#SEED2_put_out = 
+#read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED2_DE2.txt", sep='\t', header=TRUE)
+#names(SEED2_put_out)
+#dim(SEED2_put_out)
+
+DE_tests_SEED2_names = SEED2_put_out[,1]
+DE_tests_SEED2 = SEED2_put_out[,2]
+test_stats_values = SEED2_put_out[,3]
+SEED2_number_reads = SEED2_put_out[,4:(4+11)] 
+SEED2_relative_percent = SEED2_put_out[,16:(16+11)] 
+SEED2_overal_percent = SEED2_put_out[,28:(28+11)] 
+
+SEED2_average_read_count = apply(SEED2_number_reads, 1, mean)
+#output: average on individuals of SEEDlevel2, i.e. a 162-dim vector
+
+signif(
+c(
+sum(SEED2_average_read_count<10)/length(SEED2_average_read_count),
+sum(SEED2_average_read_count>=10 & SEED2_average_read_count<100)/length(SEED2_average_read_count),
+sum(SEED2_average_read_count>=100 & SEED2_average_read_count<200)/length(SEED2_average_read_count),
+sum(SEED2_average_read_count>=200 & SEED2_average_read_count<500)/length(SEED2_average_read_count),
+sum(SEED2_average_read_count>=500 & SEED2_average_read_count<1000)/length(SEED2_average_read_count),
+sum(SEED2_average_read_count>=1000)/length(SEED2_average_read_count)
+)
+,2)
+
+
+
+
+
+
+# metabolic DE testing on SEED 3 
+# doing differential testing at the last level should be a little easier
+
+bottom_level = paste(stacked_data$Subsystem.Hierarchy.1, "-", stacked_data$Subsystem.Hierarchy.2, "-", stacked_data$Subsystem.Name)
+
+DE_tests_SEED3 = NULL
+DE_tests_stats_SEED3 = NULL
+data_counts = NULL
+data_relative_percents = NULL
+data_overall_percents = NULL
+n_sizes = NULL
+
+set.seed(1019)
+#there are permutation tests inside the loop
+for( go in unique(bottom_level))
+{
+  current_data = rep(0,12)
+  current_data_n = rep(0,12)
+	for(i in 1:12)
+	{
+		this_one = which(stacked_data$id==the_samples[i] & 
+		go == paste(stacked_data$Subsystem.Hierarchy.1, "-", stacked_data$Subsystem.Hierarchy.2, "-", stacked_data$Subsystem.Name))
+		if(length(this_one)==1)
+		{
+			current_data_n[i] = stacked_data$X..Hits[this_one]
+			current_data[i] = stacked_data$X..Hits[this_one]/ 
+sum(stacked_data[
+which(stacked_data$id[this_one] == stacked_data$id &
+paste(stacked_data$Subsystem.Hierarchy.1[this_one], "-", stacked_data$Subsystem.Hierarchy.2[this_one]) ==
+paste(stacked_data$Subsystem.Hierarchy.1, "-", stacked_data$Subsystem.Hierarchy.2)),5])
+		}		
+	}
+
+#if(1==0)  # very long to run permutation.
+#{
+  #perms=10000-1
+	perms=1000-1
+	test_stats=1:perms
+	for(j in 1:perms)
+	{ 	
+		tmp=sample(1:12,12)
+		tmp=current_data[tmp]
+		test_stats[j] = abs(mean(tmp[1:6]) - mean(tmp[7:12]))
+	}
+
+	DE_tests_SEED3 = c(DE_tests_SEED3, (1+sum(
+abs(mean(current_data[1:6]) - mean(current_data[7:12])) <= test_stats))/(1+perms))
+	names(DE_tests_SEED3)[length(DE_tests_SEED3)]=go	
+#} 
+	data_overall_percents = rbind(data_overall_percents, current_data_n/number_SEED_hits)
+	data_relative_percents = rbind(data_relative_percents, current_data) 
+	n_sizes = c(n_sizes, sum(current_data_n))
+	data_counts = rbind(data_counts, current_data_n)
+	DE_tests_stats_SEED3 = c(DE_tests_stats_SEED3, mean(current_data[1:6]) - mean(current_data[7:12]))
+} 
+
+
+SEED3_putout = 
+data.frame(unique(bottom_level), DE_tests_SEED3, n_sizes, data_counts,
+ data_overall_percents, data_relative_percents) 
+names(SEED3_putout) = 
+c("name","perm.p", "total_n", "data_counts", "overall_percents", "relative_percents")
+
+#write.table(SEED3_putout, "~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED3_DE2.txt", sep='\t', col.names=TRUE)
+
+#SEED3_put_out = read.table("~/Desktop/ChapkinLab/Iddo/PVALUES/Metabolic_Profile_SEED3_DE2.txt", sep='\t',header=TRUE)
+
+
+SEED3_put_out = SEED3_putout
+
+DE_tests_SEED3_names = SEED3_put_out[,1]
+DE_tests_SEED3 = SEED3_put_out[,2]
+test_stats_values = SEED3_put_out[,3]
+SEED3_number_reads = SEED3_put_out[,4:(4+11)] 
+SEED3_relative_percent = SEED3_put_out[,16:(16+11)] 
+SEED3_overal_percent = SEED3_put_out[,28:(28+11)] 
+
+
+SEED3_average_read_count = apply(SEED3_number_reads, 1, mean)
+
+signif(
+c(
+sum(SEED3_average_read_count<10)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=10 & SEED3_average_read_count<100)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=100 & SEED3_average_read_count<200)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=200 & SEED3_average_read_count<500)/length(SEED3_average_read_count),
+sum(SEED3_average_read_count>=500 & SEED3_average_read_count<1000)/length(SEED3_average_read_count), 
+sum(SEED3_average_read_count>=1000)/length(SEED3_average_read_count)
+)
+,2)
+
+
+
+# Seeing which data we would do tests on .
+
+good_enough_depth = 
+(apply(SEED3_number_reads[1:6]>50,1,sum)==6 | apply(SEED3_number_reads[7:12]>50,1,sum)==6 ) & 
+(apply(SEED3_overal_percent[1:6]>.001,1,sum)==6 | apply(SEED3_overal_percent[7:12]>.001,1,sum)==6)
+sum(good_enough_depth)
+
+head(cbind(
+as.character(DE_tests_SEED3_names)[good_enough_depth],DE_tests_SEED3[good_enough_depth]))
+
+hist(p.adjust(DE_tests_SEED3[good_enough_depth],method="fdr"),main="FDR controlled p-value adjustment of SEEDlevel3",
+     xlab="adjusted p",ylab="counts")
+
+
+
+length(grep("Virulence", as.character(DE_tests_SEED3_names)))
+@
+
+
+\section{Microarray}
+
+  \subsection{Oct 23 \& Oct 25}
+<<Oct 23 start_micro,echo=FALSE,results='hide',fig.width=7,fig.height=6>>=
+# 6) microarray stuff.. normalization.. 
+# 6) microarray stuff.. normalization.. 
+# 6) microarray stuff.. normalization.. 
+# 6) microarray stuff.. normalization.. 
+# 6) microarray stuff.. normalization.. 
+
+
+
+options(max.print=1000)
+
+
+# Normalization is not decided yet. ..
+# I need to look at the background data. .. wonder how it looks across samples?
+# But I'm not doing that today.  Today is just setting up the two projects:
+# (1) Iddo: get two data sets ready: microarray & bacterial counts via sequencing/MG-Rast
+# (2) Damir: get two data sets ready: microarray & gene counts via sequencing
+
+#has normalization procedures
+
+#if(!("preprocessCore" %in% installed.packages())) 
+ #  install.packages("preprocessCore",repos="http://cran.rstudio.com/")
+#library(preprocessCore)
+#### above is not installed properly.
+
+#plot.colorbar
+if(!("fields" %in% installed.packages())) 
+    install.packages("fields",repos="http://cran.rstudio.com/")
+library(fields)
+
+
+# codelink fields:
+# Spot_noise_level = Bkgd_median + 1.5*Bkgd_stdev
+# Signal_strength = Spot_mean / Spot_noise_level
+# Quality_flag = Signal_strength > 1 
+# Raw_intensity = Spot_mean -- Bkgr_median
+
+# "M", "I", "C", will be treated as NA
+# So will "CI", "CS", "CL", "IS" 
+# And anything with a "P" (can't remember what it is) will also be NA
+# "S" will be treated as "high"
+# "L" will be treated as "low"
+# "S" and "L" could be one of two things: 
+# (1) malfunctions
+# (2) actual low/high measurements
+# We will assume (2) because we are trusting the measuring device anyway.
+
+
+
+#Damir data set: means, premies
+
+#after reading the data, no need to do it again
+
+#if(0=="after reading the data")
+  {
+damir_sample_names=read.table("../filenames.csv", stringsAsFactors=FALSE,sep=',',comment.char="#", header=FALSE)$V1
+
+#scratch: this is how we load a data set.
+damir_eg=read.table("../Damir/Data_files_for_Chen/T00347860_baby_43_all.csv", 
+stringsAsFactors=FALSE,sep=',',comment.char="#",quote='"',
+skip=5,nrows=54359,header=TRUE)
+damir_eg=damir_eg[c(1:5,9,12,16,21,27,32)]
+
+
+# eeeee. .. there's a weird dependence between spot size and expression level.. .
+# let's just say the radius is calculated on the basis of intensity. ..
+# that's actually probably what happens anyway.. .
+plot(damir_eg$Spot_area[damir_eg$Probe_type!="DISCOVERY"],damir_eg$Raw_intensity[damir_eg$Probe_type!="DISCOVERY"],
+     main="dependence between spot size and expression level",xlab="spot area",ylab="Raw_intensity/expression level")
+
+#importing data: making the data set accessible
+damir_samples_RawVals = NULL 
+damir_samples_Bkgd = NULL 
+damir_samples_NormVals = NULL 
+#samples_probeTypes = samples #actually, redundant: these should are constant across...
+samples_probeTypes=NULL
+damir_samples_flags = NULL
+for(i in damir_sample_names)
+{
+  damir_sample = 
+  read.table(
+	paste("../Damir/Data_files_for_Chen/",i,sep=''), 
+stringsAsFactors=FALSE,sep=',',comment.char="#",quote='"',
+skip=5,nrows=54359,header=TRUE,fill=TRUE)
+	#sample
+	dim(damir_sample)
+
+#only 2:5 should vary between samples... the rest are fixed identifiers... let's hope 
+	damir_sample = damir_sample[,c(1:5,12,16,21,27,32,24,25,33,34,35)]
+	names(damir_sample)=c("ID_REF", "Raw_intensity", "VALUE", "Quality_flag", "Signal_strength", "Bkgd_mean", "Probe_name",  "Annotation_NCBI_Acc", "Probe_type","Annotation_Pub_Probe_Targets",
+"Annotation_OGS", "Annotation_UniGene", "Annotation_Molecular_Function", "Annotation_Biological_Process", "Annotation_Cellular_Component")
+#[1] "ID_REF"                       "Raw_intensity"               
+#[3] "Normalized_intensity"         "Quality_flag"                
+#[5] "Signal_strength"              "Probe_name"                  
+#[7] "Annotation_NCBI_Acc"          "Probe_type"                  
+#[9] "Annotation_Pub_Probe_Targets"
+
+	print(length(damir_sample$Raw_intensity))
+		
+	damir_samples_RawVals = cbind(damir_samples_RawVals, damir_sample$Raw_intensity) 
+	damir_samples_Bkgd = cbind(damir_samples_Bkgd, damir_sample$Bkgd_mean) 
+	damir_samples_NormVals = cbind(damir_samples_NormVals, damir_sample$VALUE) 
+	damir_samples_flags = cbind(damir_samples_flags, damir_sample$Quality_flag)
+
+	print(i)	
+	
+	print(sum(damir_eg$ID_REF==damir_sample$ID_REF))	
+	print(sum(damir_eg$Probe_name==damir_sample$Probe_name))	
+	print(sum(damir_eg$Annotation_NCBI_Acc==damir_sample$Annotation_NCBI_Acc))
+	print(sum(damir_eg$Probe_type==damir_sample$Probe_type))	
+	print(sum(damir_eg$Annotation_Pub_Probe_Targets==damir_sample$Annotation_Pub_Probe_Targets))
+}
+
+
+
+
+
+#Iddo data set: means term FF/BF
+
+
+#get the names of the samples...
+iddo_sample_names=read.table("../file_names.csv", stringsAsFactors=FALSE,sep=',',comment.char="#", header=TRUE)$filename
+
+#sorting samples by treatment groups
+iddo_sample_groupings=read.table("../file_names.csv", stringsAsFactors=FALSE,sep=',',comment.char="#", header=TRUE)$group
+
+sample_names_tmp = iddo_sample_names
+sample_names_tmp[1:sum(iddo_sample_groupings=="FF")] = iddo_sample_names[iddo_sample_groupings=="FF"]
+sample_names_tmp[(1+sum(iddo_sample_groupings=="FF")):sum(iddo_sample_groupings=="BF"|iddo_sample_groupings=="FF")] = iddo_sample_names[iddo_sample_groupings=="BF"]
+sample_names_tmp[(1+sum(iddo_sample_groupings=="BF"|iddo_sample_groupings=="FF")):sum(iddo_sample_groupings!="rep")] = iddo_sample_names[iddo_sample_groupings=="BMS"]
+sample_names_tmp[(1+sum(iddo_sample_groupings!="rep")):length(iddo_sample_names)] = iddo_sample_names[iddo_sample_groupings=="rep"]
+
+iddo_sample_names = sample_names_tmp
+
+
+#scratch: this is how we load a data set.
+iddo_eg=read.table("../Txt_files_of_all_pts/T00346112_FF4_2.TXT", stringsAsFactors=FALSE,sep='\t',comment.char="#",quote='"',
+skip=7,nrows=54359,header=TRUE)
+iddo_eg=iddo_eg[c(1:4,12,16,21,27,32)]
+
+names(iddo_eg)
+dim(iddo_eg)
+
+#scratch: this is the standard codelink normalization
+use4normalize = (iddo_eg$Quality_flag!='M') & (iddo_eg$Probe_type=='DISCOVERY')
+
+#medianiddo_eg not exiting
+#medianiddo_eg not exiting
+#medianiddo_eg not exiting
+
+#plot(iddo_eg$VALUE[use4normalize],iddo_eg$Raw_intensity[use4normalize]/medianiddo_eg$Raw_intensity[use4normalize])
+#abline(0,1)
+
+
+#importing data: making the data set accessible
+iddo_samples_RawVals = NULL 
+iddo_samples_Bkgd = NULL 
+iddo_samples_NormVals = NULL 
+#samples_probeTypes = samples #actually, redundant: these should are constant across...
+samples_probeTypes=NULL
+iddo_samples_flags = NULL
+for(i in iddo_sample_names)
+{
+	iddo_sample = 
+	read.table(
+	paste("../Txt_files_of_all_pts/",i,sep=''), 
+			stringsAsFactors=FALSE,sep='\t',comment.char="#",quote='"',
+skip=7,nrows=54359,header=TRUE,fill=TRUE)
+	#sample
+	dim(iddo_sample)
+
+#only 2:4 should vary between samples... the rest are fixed identifiers... let's hope 
+	iddo_sample = iddo_sample[,c(1:4,12,16,21,27,32,24,25,33,34,35)]
+	names(iddo_sample)=c("ID_REF", "Raw_intensity", "VALUE", "Quality_flag", "Bkgd_mean", "Probe_name",  "Annotation_NCBI_Acc", "Probe_type","Annotation_Pub_Probe_Targets",
+"Annotation_OGS", "Annotation_UniGene", "Annotation_Molecular_Function", "Annotation_Biological_Process", "Annotation_Cellular_Component")
+#[1] "ID_REF"                       "Raw_intensity"               
+#[3] "VALUE"                        "Quality_flag"                
+#[5] "Probe_name"                   "Annotation_NCBI_Acc"         
+#[7] "Probe_type"                   "Annotation_Pub_Probe_Targets"
+
+	print(length(iddo_sample$Raw_intensity))
+		
+	iddo_samples_RawVals = cbind(iddo_samples_RawVals, iddo_sample$Raw_intensity) 
+	iddo_samples_Bkgd = cbind(iddo_samples_Bkgd, iddo_sample$Bkgd_mean) 
+	iddo_samples_NormVals = cbind(iddo_samples_NormVals, iddo_sample$VALUE) 
+	iddo_samples_flags = cbind(iddo_samples_flags, iddo_sample$Quality_flag)
+
+	print(i)	
+	
+	print(sum(damir_eg$ID_REF==iddo_sample$ID_REF))	
+	print(sum(damir_eg$Probe_name==iddo_sample$Probe_name))	
+	print(sum(damir_eg$Annotation_NCBI_Acc==iddo_sample$Annotation_NCBI_Acc))
+	print(sum(damir_eg$Probe_type==iddo_sample$Probe_type))	
+	print(sum(damir_eg$Annotation_Pub_Probe_Targets==iddo_sample$Annotation_Pub_Probe_Targets))
+}
+
+}
+#end of "not reading the data again"
+
+
+# matching to Iddo's data set.
+# Note that we 5 have replicates. . .
+# all but 1 of these also appears in Iddo's sequencing data set. 
+
+iddo_phylum_percents$Chapkin_Id
+# [1] "FF15"  "FF13"  "FF7"   "FF5"   "FF3"   "FF2"   "BF6"   "BF4"   "BF3"  
+# [10] "BMS16" "BMS10" "BMS8" 
+# These are the samples that we've got in the bacterial data. .. matched up
+
+#the below object is too early to come. Should arise after samples_RawVals defined
+#the below object is too early to come. Should arise after samples_RawVals defined
+#the below object is too early to come. Should arise after samples_RawVals defined
+#the below object is too early to come. Should arise after samples_RawVals defined
+#the below object is too early to come. Should arise after samples_RawVals defined
+
+#paired_microarray_samples = c(8, 6, 10, 3, 5, 4, 18, 13, 15, 20, 23, 21)
+#names(samples_RawVals)[paired_microarray_samples]
+# [1] "T00346131_FF15_1.TXT"  "T00346128_FF13_1.TXT"  "T00346135_FF7_1.TXT"  
+# [4] "T00346118_FF5_1.TXT"   "T00346125_FF3_1.TXT"   "T00346121_FF2_1.TXT"  
+# [7] "T00346134_BF6_1.TXT"   "T00346119_BF4_1.TXT"   "T00346127_BF3_1.TXT"  
+#[10] "T00346117_BMS16_1.TXT" "T00346136_BMS10_1.TXT" "T00346122_BMS8_1.TXT" 
+
+
+
+# we're gonna combine the two data sets, like this:
+
+all_data_sample_groups=c(iddo_sample_names, damir_sample_names)
+all_data_sample_groups[1:10]="FF"
+all_data_sample_groups[11:18]="BF"
+all_data_sample_groups[19:23]="BMS"
+all_data_sample_groups[24:28]="rep"
+all_data_sample_groups[29:34]="premie"
+
+
+samples_probeTypes = iddo_sample$Probe_type #actually, redundant: these are constant across samples since all are on the same chip.
+samples_probeNames = iddo_sample$Probe_name #actually, redundant: these are constant across samples since all are on the same chip.
+samples_NCBIanno = iddo_sample$Annotation_NCBI_Acc #actually, redundant: these are constant across samples since all are on the same chip.
+samples_ProbeInfo = iddo_sample$Annotation_Pub_Probe_Targets #actually, redundant: these are constant across samples since all are on the same chip.
+samples_IDref = iddo_sample$ID_REF #actually, redundant: these are constant across samples since all are on the same chip.
+
+samples_Annotation_OGS = iddo_sample$Annotation_OGS
+samples_Annotation_UniGene = iddo_sample$Annotation_UniGene
+samples_GO_Molecular_func = iddo_sample$Annotation_Molecular_Function 
+samples_GO_biological_proc = iddo_sample$Annotation_Biological_Process
+samples_GO_cellular_comp = iddo_sample$Annotation_Cellular_Component
+
+
+samples_RawVals = data.frame(cbind(iddo_samples_RawVals,damir_samples_RawVals))
+samples_Bkgd = data.frame(cbind(iddo_samples_Bkgd,damir_samples_Bkgd))
+samples_NormVals = data.frame(cbind(iddo_samples_NormVals,damir_samples_NormVals))
+samples_flags = data.frame(cbind(iddo_samples_flags,damir_samples_flags))
+names(samples_RawVals)= c(iddo_sample_names,damir_sample_names)
+
+##put it here
+paired_microarray_samples = c(8, 6, 10, 3, 5, 4, 18, 13, 15, 20, 23, 21)
+names(samples_RawVals)[paired_microarray_samples]
+
+
+names(samples_NormVals)= c(iddo_sample_names,damir_sample_names)
+names(samples_flags)= c(iddo_sample_names,damir_sample_names)
+
+# we don't use anything but discovery, because all the controls
+# are something else with bacteria spike ins, etc.
+table(samples_probeTypes)
+# samples_probeTypes
+# DISCOVERY  FIDUCIAL  NEGATIVE  POSITIVE 
+#     53423       192       384       360 
+
+
+#okay, let's run some raw data description stuff:
+
+
+# Dealing with initial problems
+# M's are really NA's anyway.. .  let's just do that.
+# and there's the other designated NA's as well.. . so we do that too
+# and finally. .. negative values mean the expression level is below
+# the background. .. it just means its "low".. . So, negative values 
+# are all set to a min value greater than 0. ..
+# now.. . what are we going to do for normalization??
+# do we use L values?
+
+#Keep only discovery
+samples_RawVals = samples_RawVals[samples_probeTypes=="DISCOVERY",]
+samples_Bkgd = samples_Bkgd[samples_probeTypes=="DISCOVERY",]
+samples_flags = samples_flags[samples_probeTypes=="DISCOVERY",]
+
+samples_NCBIanno=samples_NCBIanno[samples_probeTypes=="DISCOVERY"]
+samples_IDref=samples_IDref[samples_probeTypes=="DISCOVERY"]
+samples_probeNames=samples_probeNames[samples_probeTypes=="DISCOVERY"]
+
+samples_Annotation_OGS = samples_Annotation_OGS[samples_probeTypes=="DISCOVERY"]
+samples_Annotation_UniGene = samples_Annotation_UniGene[samples_probeTypes=="DISCOVERY"]
+samples_GO_Molecular_func = samples_GO_Molecular_func[samples_probeTypes=="DISCOVERY"]
+samples_GO_biological_proc = samples_GO_biological_proc[samples_probeTypes=="DISCOVERY"]
+samples_GO_cellular_comp = samples_GO_cellular_comp[samples_probeTypes=="DISCOVERY"]
+
+samples_probeTypes = samples_probeTypes[samples_probeTypes=="DISCOVERY"]
+
+
+
+dim(samples_RawVals)
+# [1] 53423    34
+
+# NA all flags that aren't G/L/S
+samples_RawVals[samples_RawVals==-9999]=NA
+samples_RawVals[samples_flags!='L' & samples_flags!='G' & samples_flags!='S']=NA
+samples_Bkgd[samples_RawVals==-9999]=NA
+samples_Bkgd[samples_flags!='L' & samples_flags!='G' & samples_flags!='S']=NA
+
+
+
+
+# What to do with the ones below 0?
+
+# you have a choice here. .. (a) or (b)?
+
+#this one doesn't work because [samples_RawVals<=0] returns all the NA spots too!
+#samples_RawVals[samples_RawVals<=0] = min(samples_RawVals[samples_RawVals>0],na.rm=TRUE)
+
+# let's make sure those funny outliers aren't because of this crazy shift stuff.. .
+
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+###wheter need that? originally no###wheter need that? originally no###wheter need that? originally no
+#samples_RawVals[samples_RawVals<=0] = NA
+
+
+
+# I like (c). .. second choice above. .. I don't think the low measurements 
+# are really a problem. .. for DE. .. we don't want low versus low comparisons. ..
+# perhaps. .. okay, i get that. .. but really, my drop to min positive does weird stuff
+#THIS IS WHAT WE'RE DOING
+tmp=c(as.matrix(samples_RawVals))
+smallest=min(tmp,na.rm=TRUE)
+tmp[which.min(c(as.matrix(samples_RawVals)))]=NA
+nextsmallest=min(tmp,na.rm=TRUE)
+samples_RawVals = samples_RawVals - smallest - (smallest - nextsmallest)
+
+
+#let's trash boring rows . . . these aren't even useful .. . come on.
+# REMEMBER.. THAT FIRST SAMPLE WAS REPEATED.. OOOPS
+# so, we're removing that here
+emptyA = 0==apply(!is.na(samples_RawVals[2:10]),1,sum)
+# remove the case of all subjects in this treatment are all NAs.
+emptyB = 0==apply(!is.na(samples_RawVals[11:23]),1,sum)
+#are we wanting to also work with the premies? sure for now.
+emptyC = 0==apply(!is.na(samples_RawVals[29:34]),1,sum)
+empty = emptyA | emptyB | emptyC
+
+samples_RawVals = samples_RawVals[!empty,]
+samples_Bkgd = samples_Bkgd[!empty,]
+samples_flags = samples_flags[!empty,]
+samples_NCBIanno=samples_NCBIanno[!empty]
+samples_IDref=samples_IDref[!empty]
+samples_probeTypes = samples_probeTypes[!empty]
+samples_probeNames=samples_probeNames[!empty]
+
+samples_Annotation_OGS = samples_Annotation_OGS[!empty]
+samples_Annotation_UniGene = samples_Annotation_UniGene[!empty]
+samples_GO_Molecular_func = samples_GO_Molecular_func[!empty]
+samples_GO_biological_proc = samples_GO_biological_proc[!empty]
+samples_GO_cellular_comp = samples_GO_cellular_comp[!empty]
+
+
+
+
+
+
+# DOING THE MA PLOT STYLE THING 
+# THIS IS OUR NORMALIZATION
+
+par(mfrow=c(1,2))
+
+tmp=samples_RawVals[,2:23]
+# take a look at less data. . . removing low flags
+tmp=samples_RawVals[
+apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,2:23]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+
+
+
+#This is because we've got a duplicated sample.
+tmp1=tmp[,1:9]
+Xs=as.matrix(log(tmp1,2))
+tmp2=tmp[,10:22]
+Ys=as.matrix(log(tmp2,2))
+Xs=apply(Xs,1,mean,na.rm=TRUE)
+Ys=apply(Ys,1,mean,na.rm=TRUE)
+
+samples_Loessed=log(tmp,2)
+
+if(0=="Kejun does not wanna that")
+{
+for(jj in 1:7)
+  {
+    #MA plot instead of x vs y plot
+    Xs = (Xs+Ys)/2
+    Ys = Ys-Xs # BF minus FF
+
+    Xseq=seq(floor(range(Xs,na.rm=TRUE)[1]),ceiling(range(Xs,na.rm=TRUE)[2])-2,.05)
+    Yseq=seq(floor(range(Ys,na.rm=TRUE)[1]),ceiling(range(Ys,na.rm=TRUE)[2]),.05)
+    #Xseq= Xseq[1:141] # for ma plot
+    #Yseq= Yseq[21:length(Yseq)] # for ma plot
+
+    hist3d = matrix(0,nrow=length(Yseq),ncol=length(Xseq))
+    for(yy in 2:length(Yseq)-1)
+      for(xx in 2:length(Xseq)-1)
+      {
+	      hist3d[yy,xx]= sum(Ys>=Yseq[yy] & Ys<Yseq[yy+1] & Xs>=Xseq[xx] & Xs<Xseq[xx+1],na.rm=TRUE)
+      }
+
+
+hist3d[hist3d==0]=NA
+
+
+
+#postscript("normalization2.eps",horizontal=FALSE,width=3.5,height=3.5,onefile=FALSE) 
+
+image(Xseq,Yseq,t(log(hist3d)),col=terrain.colors(20),
+xlab="(BF+FF)/2",ylab="BF-FF", main="MA plot, adjusted data")# w/ Loess adjustment")
+#xlab="FF gene averages",ylab="BF gene averages", main="log2 average")
+#ylim=c(-1,2),xlim=c(5,12))
+abline(0,1,lwd=2)
+abline(0,0)
+
+DF=data.frame(Xs,Ys)
+DF=na.omit(DF)
+#my_2nd = lowess(DF$Xs,DF$Ys,f=.0075)
+my_1st = loess(DF$Ys~DF$Xs, span=.25,surface="interpolate", statistics="approximate",trace.hat="approximate")#,method="symmetric")
+points(my_1st$x,my_1st$fitted,col='blue',pch='.',cex=2.5)
+
+
+colorbar.plot(mean(Xseq),min(Yseq)-.05,1:13,col=terrain.colors(20),horizontal=TRUE,strip.width=.34)
+for(i in 6+round(seq(1,length(Xseq),length(Xseq)/13)))
+{
+	text(1*(Xseq[i]-mean(Xseq))+mean(Xseq),min(Yseq)+.25,paste(floor(quantile(hist3d,i/length(Xseq),na.rm=TRUE))),col="black",cex=.5)
+}
+
+###I move the below text() ahead "dev.off()"
+text(10,5,"Less than a majority of 'Low' flags in FF or BB")
+text(7.7,-.8,"Less than a majority of 'Low' flags in FF or BB")
+
+#dev.off()
+
+
+
+
+
+# okay, homemade loess normalization coming up.
+# here we go. . . ;)
+# you have to redo this a few times by hand. . .
+# it is an iterative thing: 6 times did the trick for me.
+
+samples_Loessed[,1:9]=samples_Loessed[,1:9]+(my_1st$fitted)/2
+samples_Loessed[,10:22]=samples_Loessed[,10:22]-(my_1st$fitted)/2
+
+Xs= samples_Loessed[,1:9]
+Ys= samples_Loessed[,10:22]
+Xs=apply(Xs,1,mean,na.rm=TRUE)
+Ys=apply(Ys,1,mean,na.rm=TRUE)
+} #out of (jj in 1:7)
+
+}#out of (0=="Kejun does not wanna that")
+
+#personal shift 
+samples_Loessed[,1:9]=samples_Loessed[,1:9]+(-.15)/2
+samples_Loessed[,10:22]=samples_Loessed[,10:22]-(-.15)/2
+
+
+
+
+
+# take a look at less data. . . removing low flags
+samples_RawVals_16767=samples_RawVals[
+apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,2:23]
+dim(samples_RawVals_16767)
+# Loessed means at least half of the subjects in each treatment has high quality
+# [1] 16767    22
+# Kejun got [1] 16723    22
+# so now, I can do the two versions of the analysis 
+@
+
+
+  \subsection{Nov 3}
+  
+<<Nov 3 gene list and testing, results='hide',fig.align='center',fig.height=6,fig.width=7,echo=FALSE>>=
+# 7) microarray stuff: list subsets.. and de
+# 7) microarray stuff: list subsets.. and de
+# 7) microarray stuff: list subsets.. and de
+# 7) microarray stuff: list subsets.. and de
+# 7) microarray stuff: list subsets.. and de
+
+
+
+iddo_phylum_percents$Chapkin_Id
+# [1] "FF15"  "FF13"  "FF7"   "FF5"   "FF3"   "FF2"   "BF6"   "BF4"   "BF3"  
+# [10] "BMS16" "BMS10" "BMS8" 
+# These are the samples that we've got in the bacterial data. .. matched up
+paired_microarray_samples = c(8, 6, 10, 3, 5, 4, 18, 13, 15, 20, 23, 21)
+names(samples_RawVals)[paired_microarray_samples]
+# [1] "T00346131_FF15_1.TXT"  "T00346128_FF13_1.TXT"  "T00346135_FF7_1.TXT"  
+# [4] "T00346118_FF5_1.TXT"   "T00346125_FF3_1.TXT"   "T00346121_FF2_1.TXT"  
+# [7] "T00346134_BF6_1.TXT"   "T00346119_BF4_1.TXT"   "T00346127_BF3_1.TXT"  
+#[10] "T00346117_BMS16_1.TXT" "T00346136_BMS10_1.TXT" "T00346122_BMS8_1.TXT" 
+
+
+
+
+at_least_half_not_low = 
+apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6
+
+tmp=samples_RawVals[
+apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,2:23]
+
+
+ dim(samples_Loessed)
+#[1] 16767    22
+#kejun got 16723 22
+# gotta do the minus 1 below.  
+# dropped the first ff4 from the data set.
+names(samples_Loessed)[paired_microarray_samples-1]
+# [1] "T00346131_FF15_1.TXT"  "T00346128_FF13_1.TXT" 
+# [3] "T00346135_FF7_1.TXT"   "T00346118_FF5_1.TXT"  
+# [5] "T00346125_FF3_1.TXT"   "T00346121_FF2_1.TXT"  
+# [7] "T00346134_BF6_1.TXT"   "T00346119_BF4_1.TXT"  
+# [9] "T00346127_BF3_1.TXT"   "T00346117_BMS16_1.TXT"
+#[11] "T00346136_BMS10_1.TXT" "T00346122_BMS8_1.TXT" 
+
+
+
+
+
+# this is how samples_Loessed was made:
+# So this just matches up
+
+samples_NCBIanno_Loessed = samples_NCBIanno[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_IDref_Loessed = samples_IDref[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_probeNames_Loessed= samples_probeNames[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+
+
+samples_Annotation_OGS_Loessed = samples_Annotation_OGS[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_Annotation_UniGene_Loessed = samples_Annotation_UniGene[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_GO_Molecular_func_Loessed = samples_GO_Molecular_func[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_GO_biological_proc_Loessed = samples_GO_biological_proc[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_GO_cellular_comp_Loessed = samples_GO_cellular_comp[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+samples_flags_Loessed=samples_flags[apply(samples_flags[,2:10]=='L',1,sum,na.rm=TRUE)<5 |
+apply(samples_flags[,11:23]=='L',1,sum,na.rm=TRUE)<6,2:23]
+# Loessed means at least half of the subjects in each treatment has high quality
+
+
+# 8) microarray immunity and defense list
+# 8) microarray immunity and defense list
+# 8) microarray immunity and defense list
+# 8) microarray immunity and defense list
+# 8) microarray immunity and defense list
+
+
+# did some stuff on David. . . kickass 
+# . . . uh.. this is going to be hard to work with. 
+# okay, we got Panther Molecular Function.  It has a category called immunity and defense 
+wtf=read.table("../Iddo2/PANTHER_BP.txt", sep='\t', header=TRUE,
+               stringsAsFactors=FALSE)
+dim(wtf)
+names(wtf)
+str(wtf)
+# this is the group we're going to work with
+
+par(mfrow=c(1,1))
+par(mar=c(17,3,3,1))
+#par(mar=c(6,3,3,1))
+panther_ranking=sort(wtf$Count,index.return=TRUE,decreasing = TRUE)$ix
+barplot(wtf$Count[panther_ranking[1:20]],space=0,main="Probes assigned to Panther MF's")
+axis(1,1:20-.5, wtf$Term[panther_ranking[1:20]],las=2)
+
+
+
+ImmunologyStuff=which(wtf$Term=="BP00148:Immunity and defense")
+Gene_List = wtf$Genes[ImmunologyStuff] 
+
+parse_this_shit = NULL
+for(i in 1:wtf$Count[ImmunologyStuff])
+{
+  deliniation=regexpr(", ", Gene_List)
+  parse_this_shit=c(parse_this_shit, substr(Gene_List,1, deliniation-1))
+	Gene_List = substr(Gene_List,deliniation+2,nchar(Gene_List))
+}
+parse_this_shit=c(parse_this_shit, Gene_List)
+#THIS THING ABOVE IS PANTERH IMMUNITY LIST
+
+scotts_panther_list = parse_this_shit
+
+
+#ROBB JENIFER IMMUNITY LIST
+
+robbs_imunology_list = read.table("../Iddo2/robbs_imunology_genes.csv", sep=',', header=TRUE, skip=0, 
+                                  comment.char = "#", stringsAsFactors=FALSE)
+names(robbs_imunology_list) 
+
+# there's some genes on Robb's list that aren't actually on the codelink
+# so for those, we're just not bothering to look for them obviously
+robbs_imunology_list = robbs_imunology_list$Official.Gene.Name[robbs_imunology_list$codelink==1]
+
+
+
+#LAST ROBB JENIFER IMMUNITY LIST (SECOND LIST) 
+# here, we're adding the third list from Robb/Jennifer
+jennifers_immunology_genes = read.table("../Iddo2/robbs_imunology_genes_TWO_from_jennifer.csv", sep=',', 
+                                        header=TRUE, skip=0, comment.char = "#", stringsAsFactors=FALSE)
+
+names(jennifers_immunology_genes)
+jennifers_immunology_genes = jennifers_immunology_genes$Official.Gene.Name
+
+
+
+#write.table(combo_immunology_list, "../Iddo2/panther_robb_jennifer_immunology_combo.csv", sep=",", row.names=FALSE, col.names=FALSE)
+
+
+combo_immunology_list = unique(c(scotts_panther_list,robbs_imunology_list,jennifers_immunology_genes))
+
+
+# 10) de testing of immunology genes
+# 10) de testing of immunology genes
+# 10) de testing of immunology genes
+# 10) de testing of immunology genes
+# 10) de testing of immunology genes
+
+
+# GET THE DIRECTION OF EXPRESSION ALONG WITH THE PVALUE
+
+
+# so now, let's just look at the immunological genes
+Immunology_Probes = 1:length(samples_Annotation_OGS_Loessed)
+for(i in 1:length(samples_Annotation_OGS_Loessed))
+{
+	Immunology_Probes[i]=sum(samples_Annotation_OGS_Loessed[i]==combo_immunology_list)
+}
+sum(Immunology_Probes)
+Immunology_Probes=Immunology_Probes==1
+head(unique(samples_Annotation_OGS_Loessed[Immunology_Probes]),10)
+tail(unique(samples_Annotation_OGS_Loessed[Immunology_Probes]),10)
+
+
+# cuts the data set down to just those Immunology genes
+
+
+
+# here's are immunology subset
+samples_NCBIanno_Loessed_Immuno = samples_NCBIanno_Loessed[Immunology_Probes]
+samples_IDref_Loessed_Immuno = samples_IDref_Loessed[Immunology_Probes]
+samples_probeNames_Loessed_Immuno= samples_probeNames_Loessed[Immunology_Probes]
+
+samples_Annotation_OGS_Loessed_Immuno = samples_Annotation_OGS_Loessed[Immunology_Probes]
+samples_Annotation_UniGene_Loessed_Immuno = samples_Annotation_UniGene_Loessed[Immunology_Probes]
+samples_GO_Molecular_func_Loessed_Immuno = samples_GO_Molecular_func_Loessed[Immunology_Probes]
+samples_GO_biological_proc_Loessed_Immuno = samples_GO_biological_proc_Loessed[Immunology_Probes]
+samples_GO_cellular_comp_Loessed_Immuno = samples_GO_cellular_comp_Loessed[Immunology_Probes]
+
+samples_RawVals_16767_Immuno = samples_RawVals_16767[Immunology_Probes,]
+samples_Loessed_Immuno=samples_Loessed[Immunology_Probes,]
+samples_flags_Loessed_Immuno=samples_flags_Loessed[Immunology_Probes,]
+
+
+
+# FF/BF DE expression testing in samples_RawVals_16767_Immuno & samples_Loessed_Immuno
+
+
+
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+#actually, right now we want to use all the samples:
+treatA=1:9
+treatB=10:22
+
+
+names(samples_Loessed_Immuno)[treatA]
+names(samples_Loessed_Immuno)[treatB]
+
+
+Immuno_pvalues_loessed = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+Immuno_pvalues_rawvals = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+Immuno_stat_loessed = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+Immuno_stat_rawvals = 1:length(samples_Annotation_OGS_Loessed_Immuno)
+for(i in 1:length(samples_Annotation_OGS_Loessed_Immuno))
+{
+treatA=1:9
+treatB=10:22
+if(all(is.na(samples_Loessed_Immuno[i, treatA])) | all(is.na(samples_Loessed_Immuno[i, treatA]))){# Kejun added those, otherwise cannot even run
+  Immuno_pvalues_loessed[i]=NA
+  Immuno_pvalues_rawvals[i]=NA
+}
+else{
+  Immuno_pvalues_loessed[i] = t.test(samples_Loessed_Immuno[i, treatA], samples_Loessed_Immuno[i, treatB])$p.value
+	Immuno_pvalues_rawvals[i] = t.test(log(samples_RawVals_16767_Immuno[i, treatA],2), log(samples_RawVals_16767_Immuno[i, treatB],2))$p.value
+}
+if(all(is.na(samples_Loessed_Immuno[i, treatA])) | all(is.na(samples_Loessed_Immuno[i, treatA]))){# Kejun added those, otherwise cannot even run
+  Immuno_stat_loessed[i]=NA
+  Immuno_stat_rawvals[i]=NA
+}
+else{
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+	Immuno_stat_loessed[i] = t.test(samples_Loessed_Immuno[i, treatA], samples_Loessed_Immuno[i, treatB])$estimate[1] - 
+                          t.test(samples_Loessed_Immuno[i, treatA], samples_Loessed_Immuno[i, treatB])$estimate[2] 
+	Immuno_stat_rawvals[i] = t.test(log(samples_RawVals_16767_Immuno[i, treatA],2), log(samples_RawVals_16767_Immuno[i, treatB],2))$estimate[1] - t.test(log(samples_RawVals_16767_Immuno[i, treatA],2), log(samples_RawVals_16767_Immuno[i, treatB],2))$estimate[2]
+}
+}
+
+hist(Immuno_pvalues_loessed,main="Loessed Immunology t test",xlab="unadjusted p-value")
+hist(Immuno_pvalues_rawvals,main="Raw Immunology t test",xlab="unadjusted p-value")
+#hist(Immuno_stat_loessed)
+#hist(Immuno_stat_rawvals)
+
+#Immuno_stat_loessed[samples_Annotation_OGS_Loessed_Immuno=="REL"]
+
+
+if(0=="cannot run, file does not exist"){
+# 11) de testing of Intestinal_Probes genes.. that is.. chen's list
+# 11) de testing of Intestinal_Probes genes.. that is.. chen's list
+# 11) de testing of Intestinal_Probes genes.. that is.. chen's list
+# 11) de testing of Intestinal_Probes genes.. that is.. chen's list
+# 11) de testing of Intestinal_Probes genes.. that is.. chen's list
+
+chen_list=read.table("~/Desktop/ChapkinLab/meta_host_paper/baby_markers.txt", sep='\t', header=TRUE,
+stringsAsFactors=FALSE)
+chen_list=chen_list[,3]
+unique(chen_list)
+length(chen_list)
+chen_list=unique(chen_list)
+chen_list = chen_list[chen_list != "NULL"]
+
+# so now, let's just look at the immunological genes
+Intestinal_Probes = 1:length(samples_Annotation_OGS_Loessed)
+for(i in 1:length(samples_Annotation_OGS_Loessed))
+{
+	Intestinal_Probes[i]=sum(samples_Annotation_OGS_Loessed[i]==chen_list)
+}
+sum(Intestinal_Probes)
+Intestinal_Probes=Intestinal_Probes==1
+unique(samples_Annotation_OGS_Loessed[Intestinal_Probes])
+sum(Intestinal_Probes)
+
+# cuts the data set down to just those Intestinal genes
+
+
+
+# here's are immunology subset
+samples_NCBIanno_Loessed_Intest = samples_NCBIanno_Loessed[Intestinal_Probes]
+samples_IDref_Loessed_Intest = samples_IDref_Loessed[Intestinal_Probes]
+samples_probeNames_Loessed_Intest = samples_probeNames_Loessed[Intestinal_Probes]
+
+samples_Annotation_OGS_Loessed_Intest = samples_Annotation_OGS_Loessed[Intestinal_Probes]
+samples_Annotation_UniGene_Loessed_Intest = samples_Annotation_UniGene_Loessed[Intestinal_Probes]
+samples_GO_Molecular_func_Loessed_Intest = samples_GO_Molecular_func_Loessed[Intestinal_Probes]
+samples_GO_biological_proc_Loessed_Intest = samples_GO_biological_proc_Loessed[Intestinal_Probes]
+samples_GO_cellular_comp_Loessed_Intest = samples_GO_cellular_comp_Loessed[Intestinal_Probes]
+
+samples_RawVals_16767_Intest = samples_RawVals_16767[Intestinal_Probes,]
+samples_Loessed_Intest=samples_Loessed[Intestinal_Probes,]
+samples_flags_Loessed_Intest=samples_flags_Loessed[Intestinal_Probes,]
+
+
+
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+#actually, right now we want to use all the samples:
+treatA=1:9
+treatB=10:22
+
+
+names(samples_Loessed_Intest)[treatA]
+names(samples_Loessed_Intest)[treatB]
+
+
+Intest_pvalues_loessed = 1:length(samples_Annotation_OGS_Loessed_Intest)
+Intest_pvalues_rawvals = 1:length(samples_Annotation_OGS_Loessed_Intest)
+Intest_stat_loessed = 1:length(samples_Annotation_OGS_Loessed_Intest)
+Intest_stat_rawvals = 1:length(samples_Annotation_OGS_Loessed_Intest)
+for(i in 1:length(samples_Annotation_OGS_Loessed_Intest))
+{
+treatA=1:9
+treatB=10:22
+	Intest_pvalues_loessed[i] = t.test(samples_Loessed_Intest[i, treatA], samples_Loessed_Intest[i, treatB])$p.value
+	Intest_pvalues_rawvals[i] = t.test(log(samples_RawVals_16767_Intest[i, treatA],2), log(samples_RawVals_16767_Intest[i, treatB],2))$p.value
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+	Intest_stat_loessed[i] = t.test(samples_Loessed_Intest[i, treatA], samples_Loessed_Intest[i, treatB])$estimate[1]-t.test(samples_Loessed_Intest[i, treatA], samples_Loessed_Intest[i, treatB])$estimate[2]
+
+	Intest_stat_rawvals[i] = t.test(log(samples_RawVals_16767_Intest[i, treatA],2), log(samples_RawVals_16767_Intest[i, treatB],2))$estimate[1]-t.test(log(samples_RawVals_16767_Intest[i, treatA],2), log(samples_RawVals_16767_Intest[i, treatB],2))$estimate[2]
+}
+
+hist(Intest_pvalues_loessed)
+hist(Intest_pvalues_rawvals)
+hist(Intest_stat_loessed)
+hist(Intest_stat_rawvals) 
+}
+#out of 0=="cannot run, file does not exist"
+
+#okay, it looks like we're alright.. but actually, what's happening is
+#the stats change depending on if we use all the samples or just some of the samples
+#wack. yes.
+
+if(1==0) #can not run either
+{
+#our samples aren't matching..
+#somewhere we got the wrong ones
+samples_Loessed_Immuno[428,]#new set
+loessed_DE_Immunology_set[17,]#
+
+samples_RawVals
+samples_Annotation_OGS
+samples_Loessed
+samples_Annotation_OGS_Loessed
+
+
+
+which(samples_Annotation_OGS=="REL")
+samples_RawVals[c(1910,1974,35077),]
+
+
+samples_RawVals_16767
+
+which(samples_Annotation_OGS_Loessed=="REL")
+
+samples_RawVals_16767[11264,2:23]
+
+samples_Loessed[11264,2:23]
+
+par(mfrow=c(1,2))
+plot(c(samples_RawVals_16767[11264,]), c(samples_Loessed[11264,]))
+plot(c(rawvals_DE_Immunology_set[17,]), c(loessed_DE_Immunology_set[17,]))
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+plot(c(loessed_DE_Immunology_set[17,]), c(samples_Loessed[11264,c(treatA, treatB)]))
+
+
+samples_Annotation_OGS_Loessed_Immuno
+plot(
+c(samples_Loessed_Immuno[samples_Annotation_OGS_Loessed_Immuno=="REL",c(treatA, treatB)]),
+c(samples_Loessed[11264,c(treatA, treatB)]))
+
+
+samples_RawVals[35077,2:23]
+#so.. the raw values are all okay.
+#that's probably where we should get our values from then..
+}
+# out of #can not run either
+@
+
+  \subsection{Nov 5}
+  After getting the Intestinal gene data.
+<<Nov.5,fig.align='center',fig.height=6,fig.width=6,echo=FALSE,results='hide'>>=
+if(!("xlsx" %in% installed.packages())) install.packages("xlsx")
+library(xlsx)
+test_intestinal<-read.xlsx("../Human Colonic Biomarkers_101014.xlsx",1,start=3,end=3246)
+intestinal_list<-test_intestinal$OGS
+intestinal_list<-levels(intestinal_list)
+intestinal_list<-toupper(intestinal_list)
+intestinal_list<-unique(intestinal_list)
+Intestinal_Probes = 1:length(samples_Annotation_OGS_Loessed)
+for(i in 1:length(samples_Annotation_OGS_Loessed))
+{
+  Intestinal_Probes[i]=sum(samples_Annotation_OGS_Loessed[i]==intestinal_list)
+}
+sum(Intestinal_Probes)
+Intestinal_Probes=Intestinal_Probes==1
+unique(samples_Annotation_OGS_Loessed[Intestinal_Probes])
+sum(Intestinal_Probes)
+
+# here's are intestinal subset
+samples_NCBIanno_Loessed_Intest = samples_NCBIanno_Loessed[Intestinal_Probes]
+samples_IDref_Loessed_Intest = samples_IDref_Loessed[Intestinal_Probes]
+samples_probeNames_Loessed_Intest = samples_probeNames_Loessed[Intestinal_Probes]
+
+samples_Annotation_OGS_Loessed_Intest = samples_Annotation_OGS_Loessed[Intestinal_Probes]
+samples_Annotation_UniGene_Loessed_Intest = samples_Annotation_UniGene_Loessed[Intestinal_Probes]
+samples_GO_Molecular_func_Loessed_Intest = samples_GO_Molecular_func_Loessed[Intestinal_Probes]
+samples_GO_biological_proc_Loessed_Intest = samples_GO_biological_proc_Loessed[Intestinal_Probes]
+samples_GO_cellular_comp_Loessed_Intest = samples_GO_cellular_comp_Loessed[Intestinal_Probes]
+
+samples_RawVals_16767_Intest = samples_RawVals_16767[Intestinal_Probes,]
+samples_Loessed_Intest=samples_Loessed[Intestinal_Probes,]
+samples_flags_Loessed_Intest=samples_flags_Loessed[Intestinal_Probes,]
+
+
+if(0=="no need to run t test again for Intestinal"){
+  
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+#actually, right now we want to use all the samples:
+treatA=1:9
+treatB=10:22
+
+
+names(samples_Loessed_Intest)[treatA]
+names(samples_Loessed_Intest)[treatB]
+
+
+Intest_pvalues_loessed = 1:length(samples_Annotation_OGS_Loessed_Intest)
+Intest_pvalues_rawvals = 1:length(samples_Annotation_OGS_Loessed_Intest)
+Intest_stat_loessed = 1:length(samples_Annotation_OGS_Loessed_Intest)
+Intest_stat_rawvals = 1:length(samples_Annotation_OGS_Loessed_Intest)
+for(i in 1:length(samples_Annotation_OGS_Loessed_Intest))
+{
+treatA=1:9
+treatB=10:22
+  Intest_pvalues_loessed[i] = t.test(samples_Loessed_Intest[i, treatA], samples_Loessed_Intest[i, treatB])$p.value
+	Intest_pvalues_rawvals[i] = t.test(log(samples_RawVals_16767_Intest[i, treatA],2), log(samples_RawVals_16767_Intest[i, treatB],2))$p.value
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+	Intest_stat_loessed[i] = t.test(samples_Loessed_Intest[i, treatA], samples_Loessed_Intest[i, treatB])$estimate[1]-t.test(samples_Loessed_Intest[i, treatA], samples_Loessed_Intest[i, treatB])$estimate[2]
+
+	Intest_stat_rawvals[i] = t.test(log(samples_RawVals_16767_Intest[i, treatA],2), log(samples_RawVals_16767_Intest[i, treatB],2))$estimate[1]-t.test(log(samples_RawVals_16767_Intest[i, treatA],2), log(samples_RawVals_16767_Intest[i, treatB],2))$estimate[2]
+}
+
+hist(Intest_pvalues_loessed)
+hist(Intest_pvalues_rawvals)
+}#out of (0=="no need to run t test again for Intestinal")
+
+# 12) random probes list AND also generating my good subject generated lists
+# 12) random probes list AND also generating my good subject generated lists 
+# 12) random probes list AND also generating my good subject generated lists
+# 12) random probes list AND also generating my good subject generated lists 
+# 12) random probes list AND also generating my good subject generated lists 
+
+
+set.seed(1105)
+Random_Probes = sample((1:length(samples_Annotation_OGS_Loessed))[0 == (Intestinal_Probes + Immunology_Probes + (samples_Annotation_OGS_Loessed == "NULL") )], 700)
+sum(Intestinal_Probes[Random_Probes])
+sum(Immunology_Probes[Random_Probes])
+length(unique(samples_Annotation_OGS_Loessed[Random_Probes])) 
+
+Random_Probes_tmp = 1:560
+i=1
+j=1
+while(i < 561)
+{
+  if(1==sum(samples_Annotation_OGS_Loessed[Random_Probes] == (samples_Annotation_OGS_Loessed[Random_Probes])[j]))
+	{
+		Random_Probes_tmp[i] = Random_Probes[j]
+		i=i+1
+	}
+	j=j+1
+}
+length(unique(samples_Annotation_OGS_Loessed[Random_Probes_tmp])) 
+
+Random_Probes = Random_Probes_tmp
+
+# I have to somehow now remove the duplicates and stil end up with 560.
+#okay, i'm gonna do it by over sampling and then throwing away doubles
+
+
+
+# here's are random subset
+samples_NCBIanno_Loessed_Random = samples_NCBIanno_Loessed[Random_Probes]
+samples_IDref_Loessed_Random = samples_IDref_Loessed[Random_Probes]
+samples_probeNames_Loessed_Random = samples_probeNames_Loessed[Random_Probes]
+
+samples_Annotation_OGS_Loessed_Random = samples_Annotation_OGS_Loessed[Random_Probes]
+samples_Annotation_UniGene_Loessed_Random = samples_Annotation_UniGene_Loessed[Random_Probes]
+samples_GO_Molecular_func_Loessed_Random = samples_GO_Molecular_func_Loessed[Random_Probes]
+samples_GO_biological_proc_Loessed_Random = samples_GO_biological_proc_Loessed[Random_Probes]
+samples_GO_cellular_comp_Loessed_Random = samples_GO_cellular_comp_Loessed[Random_Probes]
+
+samples_RawVals_16767_Random = samples_RawVals_16767[Random_Probes,]
+samples_Loessed_Random=samples_Loessed[Random_Probes,]
+samples_flags_Loessed_Random=samples_flags_Loessed[Random_Probes,]
+
+
+
+treatA=paired_microarray_samples[1:6]-1
+treatB=paired_microarray_samples[7:12]-1
+#actually, right now we want to use all the samples:
+treatA=1:9
+treatB=10:22
+
+
+names(samples_Loessed_Random)[treatA]
+names(samples_Loessed_Random)[treatB]
+
+
+
+Random_pvalues_loessed = 1:length(samples_Annotation_OGS_Loessed_Random)
+Random_pvalues_rawvals = 1:length(samples_Annotation_OGS_Loessed_Random)
+Random_stat_loessed = 1:length(samples_Annotation_OGS_Loessed_Random)
+Random_stat_rawvals = 1:length(samples_Annotation_OGS_Loessed_Random)
+for(i in 1:length(samples_Annotation_OGS_Loessed_Random))
+{
+  Random_pvalues_loessed[i] = t.test(samples_Loessed_Random[i, treatA], samples_Loessed_Random[i, treatB])$p.value
+	Random_pvalues_rawvals[i] = t.test(log(samples_RawVals_16767_Random[i, treatA],2), log(samples_RawVals_16767_Random[i, treatB],2))$p.value
+
+	Random_stat_loessed[i] = t.test(samples_Loessed_Random[i, treatA], samples_Loessed_Random[i, treatB])$estimate[1] - t.test(samples_Loessed_Random[i, treatA], samples_Loessed_Random[i, treatB])$estimate[2]
+	Random_stat_rawvals[i] = t.test(log(samples_RawVals_16767_Random[i, treatA],2), log(samples_RawVals_16767_Random[i, treatB],2))$estimate[1] - t.test(log(samples_RawVals_16767_Random[i, treatA],2), log(samples_RawVals_16767_Random[i, treatB],2))$estimate[2]
+}
+
+hist(Random_pvalues_loessed,main="Random subset of loessed: p value", xlab="unadjusted p")
+hist(Random_pvalues_rawvals,main="Random subset of raw: p value", xlab="unadjusted p")
+
+if(0=="no need"){
+#par(mfrow=c(1,3))
+par(mfrow=c(1,2))
+hist(Random_pvalues_loessed)
+#hist(Intest_pvalues_loessed)
+hist(Immuno_pvalues_loessed)
+}#out of 0=="no need"
+
+if(0=="no qvalue"){
+sum(qvalue(Random_pvalues_loessed)$q<.2)/length(Random_pvalues_loessed)
+#sum(qvalue(Intest_pvalues_loessed)$q<.2)/length(Intest_pvalues_loessed)
+sum(qvalue(Immuno_pvalues_loessed)$q<.2)/length(Immuno_pvalues_loessed)
+
+
+#par(mfrow=c(1,3))
+par(mfrow=c(1,2))
+par(mar=c(5,4,3,2))
+}
+
+@
+
+  \subsection{Nov 9}
+  <<Nov.9,fig.align='center',fig.height=6,fig.width=7,echo=FALSE,results='markup'>>=
+#need to intall bioconduct before PMA, otherwise cannot work
+if(0=="installed"){
+  source("http://bioconductor.org/biocLite.R")
+  biocLite()
+  source("http://bioconductor.org/biocLite.R")
+  biocLite("impute")
+}
+if(!("PMA") %in% installed.packages()) install.packages("PMA")
+library(PMA)
+cca_seed2<-t(SEED2_number_reads)
+colnames(cca_seed2)<-as.character(DE_tests_SEED2_names)
+cca_microarray_subjects<-samples_Loessed_Immuno[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+cca_microarray_subjects<-t(cca_microarray_subjects)
+rownames(cca_microarray_subjects)<-rownames(cca_seed2)
+colnames(cca_microarray_subjects)<-samples_Annotation_OGS_Loessed_Immuno
+cca_microarray_subjects<-cca_microarray_subjects[,colSums(is.na(cca_microarray_subjects))==0]
+cca_microarray_subjects_BF<-cca_microarray_subjects[1:6,]
+cca_microarray_subjects_FF<-cca_microarray_subjects[7:12,]
+cca_seed2_BF<-cca_seed2[1:6,]
+cca_seed2_BF<-cca_seed2_BF[,colSums(cca_seed2_BF)>3]
+cca_seed2_FF<-cca_seed2[7:12,]
+cca_seed2_FF<-cca_seed2_FF[,colSums(cca_seed2_FF)>3]
+cca_permut_BF<-CCA.permute(x=cca_seed2_BF,z=cca_microarray_subjects_BF,
+                           typex="standard",typez="standard",nperms=7)
+print(cca_permut_BF)
+plot(cca_permut_BF)
+#plot(cca_permut)
+#cca_out<-CCA(x=cca_seed2,z=cca_microarray_subjects,typex="standard",typez="standard",
+#             penaltyx=0.3,penaltyz=0.3,xnames=colnames(cca_seed2),
+#             znames=colnames(cca_microarray_subjects))
+cca_out_BF<-CCA(x=cca_seed2_BF,z=cca_microarray_subjects_BF,
+             typex="standard",typez="standard",
+             penaltyx=0.2333,penaltyz=0.2333,
+             xnames=abbreviate(colnames(cca_seed2_BF),min=20),
+             znames=colnames(cca_microarray_subjects_BF))
+print(cca_out_BF,v=T)
+cca_permut_FF<-CCA.permute(x=cca_seed2_FF,z=cca_microarray_subjects_FF,
+                           typex="standard",typez="standard",nperms=7)
+print(cca_permut_FF)
+plot(cca_permut_FF)
+cca_out_FF<-CCA(x=cca_seed2_FF,z=cca_microarray_subjects_FF,
+             typex="standard",typez="standard",
+             #penaltyx=0.567,penaltyz=0.567,
+             penaltyx=0.2333,penaltyz=0.2333,
+             xnames=abbreviate(colnames(cca_seed2_FF),min=20),
+             znames=colnames(cca_microarray_subjects_FF))
+print(cca_out_FF,v=T)
+@
+
+ \subsection{Nov 16}
+ ggplot the scatterplots of first components
+ <<Nov 16,fig.align='center',fig.width=7,fig.height=6,echo=FALSE,results='hide'>>=
+library(PMA)
+cca_permute_both<-CCA.permute(x=cca_seed2,z=cca_microarray_subjects,
+                          typex="standard",typez="standard",nperms=7)
+print(cca_permute_both)
+cca_out_both<-CCA(x=cca_seed2,z=cca_microarray_subjects,
+                  typex="standard",typez="standard",
+                  penaltyx=0.3,penaltyz=0.3,
+                  xnames=abbreviate(colnames(cca_seed2),min=20),
+                 znames=colnames(cca_microarray_subjects),
+                 K=2)
+print(cca_out_both)
+cca_out_both$u
+cca_scores_u<-cca_seed2%*%cca_out_both$u
+cca_scores_v<-cca_microarray_subjects%*%cca_out_both$v
+cca_scores<-cbind(cca_scores_u,cca_scores_v)
+colnames(cca_scores)<-c("U1","U2","V1","V2")
+cca_scores<-as.data.frame(cca_scores)
+cca_scores$type<-c(rep("BF",6),rep("FF",6))
+if(!("ggplot2" %in% installed.packages())) install.packages("ggplot2")
+library(ggplot2)
+#qplot(data=cca_scores,x=U1,y=V1,col=c(rep(0,6),rep(1,6)))
+myplot1<-ggplot(cca_scores,aes(x=U1,y=U2,col=V1,shape=type))
+myplot1<-myplot1+geom_point(size=4)
+myplot1<-myplot1+scale_colour_continuous(name="First Component\nScores of Immunology",
+                                         low="blue",high="red")
+myplot1<-myplot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+myplot1<-myplot1+geom_text(aes(label=rownames(cca_scores)),col="black",hjust=1.1,size=4)
+myplot1<-myplot1+scale_x_continuous("First Component Scores of Seedlevel2",
+                                    limits=c(50,750))
+myplot1<-myplot1+scale_y_continuous("Second Component Scores of Seedlevel2")
+myplot1<-myplot1+labs(title="Seedlevel2 as base")
+myplot1<-myplot1+theme(legend.title = element_text(size=16),
+                       plot.title = element_text(lineheight=1.5, face="bold"),
+                       legend.text=element_text(size=12))
+myplot1
+
+
+###next plot:
+myplot2<-ggplot(cca_scores,aes(x=V1,y=V2,col=U1,shape=type))
+myplot2<-myplot2+geom_point(size=4)
+myplot2<-myplot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",
+                                         low="blue",high="red")
+myplot2<-myplot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+myplot2<-myplot2+geom_text(aes(label=rownames(cca_scores)),col="black",hjust=1.1,size=5)
+myplot2<-myplot2+scale_x_continuous("First Component Scores of Immunology",
+                                    limits=c(55,75))
+myplot2<-myplot2+scale_y_continuous("Second Component Scores of Immunology")
+myplot2<-myplot2+labs(title="Immunology as base")
+myplot2<-myplot2+theme(legend.title = element_text(size=16),
+                       plot.title = element_text(lineheight=1.5, face="bold"),
+                       legend.text=element_text(size=12))
+myplot2
+
+
+#After knowing ggplot2, we can do boxplot quickly:
+gg_level1_functions_percents<-t(level1_functions_percents)
+gg_level1_functions_percents<-stack(as.data.frame(gg_level1_functions_percents))
+#the above must have as.data.frame(); otherwise the matrix will fail
+gg_level1_functions_percents<-cbind(gg_level1_functions_percents,
+                                    type=rep(rep(c("BF","FF"),each=6),27))
+try_gg<-ggplot(data=gg_level1_functions_percents,
+               aes(x=ind,y=values,fill=type))+geom_boxplot()
+try_gg<-try_gg+theme(axis.text.x=element_text(angle=90),axis.title.x=element_blank())
+try_gg<-try_gg+ylab("Percentage")+labs(title="All Seedlevel1")
+@
+ \subsection{Nov 25}
+ more ggplot the scaterplots of the components
+<<Nov 25,echo=FALSE>>=
+library(ggplot2)
+#first seed component:
+cca_seed2_sum<-apply(t(cca_seed2),1,sum)
+cca_seed_select1<-cca_seed2_sum*cca_out_both$u[,1]
+names(cca_seed_select1)<-colnames(cca_seed2)
+
+cca_seed_select1<-sort(cca_seed_select1,decr=T)
+cca_seed_select1_name<-names(cca_seed_select1[1:5]) #choose largest 5
+my_row1<-which(colnames(cca_seed2) %in% cca_seed_select1_name)
+cca_seed_select1_score<-cca_seed2[,my_row1]%*%cca_out_both$u[my_row1,1]
+#second seed component:
+cca_seed_select2<-cca_seed2_sum*cca_out_both$u[,2]
+names(cca_seed_select2)<-colnames(cca_seed2)
+cca_seed_select2<-sort(cca_seed_select2,decr=T)
+cca_seed_select2_name<-names(cca_seed_select2[1:5]) #choose largest 5
+my_row2<-which(colnames(cca_seed2) %in% cca_seed_select2_name)
+cca_seed_select2_score<-cca_seed2[,my_row2]%*%cca_out_both$u[my_row2,2]
+cca_seed_select2_scores<-cbind(cca_seed_select1_score,cca_seed_select2_score)
+
+## immunology components:
+#first immunology component:
+cca_micro_sum<-apply(t(cca_microarray_subjects),1,sum)
+cca_micro_select1<-cca_micro_sum*cca_out_both$v[,1]
+names(cca_micro_select1)<-colnames(cca_microarray_subjects)
+
+cca_micro_select1<-sort(cca_micro_select1,decr=T)
+cca_micro_select1_name<-names(cca_micro_select1[1:10]) # choose largest 10
+my_row1<-which(colnames(cca_microarray_subjects) %in% cca_micro_select1_name)
+cca_micro_select1_score<-cca_microarray_subjects[,my_row1]%*%cca_out_both$v[my_row1,1]
+#second seed component:
+cca_micro_select2<-cca_micro_sum*cca_out_both$v[,2]
+names(cca_micro_select2)<-colnames(cca_microarray_subjects)
+
+cca_micro_select2<-sort(cca_micro_select2,decr=T)
+cca_micro_select2_name<-names(cca_micro_select2[1:10]) # choose largest 10
+my_row2<-which(colnames(cca_microarray_subjects) %in% cca_micro_select2_name)
+cca_micro_select2_score<-cca_microarray_subjects[,my_row2]%*%cca_out_both$v[my_row2,2]
+
+#put together:
+cca_select_scores<-cbind(cca_seed_select2_scores,cca_micro_select1_score,cca_micro_select2_score)
+colnames(cca_select_scores)<-c("U1","U2","V1","V2")
+cca_select_scores<-as.data.frame(cca_select_scores)
+cca_select_scores$type<-c(rep("BF",6),rep("FF",6))
+
+# then we plot:
+myplot3<-ggplot(cca_select_scores,aes(x=U1,y=U2,col=V1,shape=type))
+myplot3<-myplot3+geom_point(size=4)
+myplot3<-myplot3+scale_colour_continuous(name="First Component\nScores of Immunology",
+                                         low="blue",high="red")
+myplot3<-myplot3+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+myplot3<-myplot3+geom_text(aes(label=rownames(cca_scores)),col="black",hjust=1.1,size=4)
+myplot3<-myplot3+scale_x_continuous("First Compo. of Seedlevel2 (selected)",
+                                    limits=c(50,600))
+myplot3<-myplot3+scale_y_continuous("Second Compo. of Seedlevel2 (selected)")
+myplot3<-myplot3+labs(title="Select Genes (5 from seed, 10 from immun)")
+myplot3<-myplot3+theme(legend.title = element_text(size=16),
+                       plot.title = element_text(lineheight=1.5, face="bold"),
+                       legend.text=element_text(size=12))
+myplot3
+
+###half select:
+cca_half_select<-cbind(cca_scores_u, cca_micro_select1_score,
+                       cca_micro_select2_score)
+colnames(cca_half_select)<-c("U1","U2","V1","V2")
+cca_half_select<-as.data.frame(cca_half_select)
+cca_half_select$type<-c(rep("BF",6),rep("FF",6))
+
+
+myplot4<-ggplot(cca_half_select,aes(x=U1,y=U2,col=V1,shape=type))
+myplot4<-myplot4+geom_point(size=4)
+myplot4<-myplot4+scale_colour_continuous(name="First Component\nScores of Immunology",
+                                         low="blue",high="red")
+myplot4<-myplot4+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+myplot4<-myplot4+geom_text(aes(label=rownames(cca_scores)),col="black",hjust=1.1,size=4)
+myplot4<-myplot4+scale_x_continuous("First Component Scores of Seedlevel2",
+                                    limits=c(50,750))
+myplot4<-myplot4+scale_y_continuous("Second Component Scores of Seedlevel2")
+myplot4<-myplot4+labs(title="Select Genes (10 from immun)")
+myplot4<-myplot4+theme(legend.title = element_text(size=16),
+                       plot.title = element_text(lineheight=1.5, face="bold"),
+                       legend.text=element_text(size=12))
+myplot4
+
+##try to use a line to connet before and after selection
+cca_select_scores_2<-cca_select_scores
+rownames(cca_select_scores_2)<-paste(rownames(cca_select_scores),"_2",sep="")
+cca_scores_both<-rbind(cca_scores,cca_select_scores_2)
+cca_scores_both$name<-rep(rownames(cca_select_scores),2)
+myplot5<-ggplot(cca_scores_both,aes(x=U1,y=U2,col=V1,
+                                    shape=type,group=name))
+myplot5<-myplot5+geom_point(size=4)+geom_line()
+myplot5<-myplot5+scale_colour_continuous(name="First Component\nScores of Immunology",
+                                         low="blue",high="red")
+myplot5<-myplot5+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+myplot5<-myplot5+geom_text(aes(label=cca_scores_both$name),
+                               col="black",hjust=1.1,size=4)
+myplot5<-myplot5+scale_x_continuous("First Compo. of Seedlevel2 (selected)",
+                                    limits=c(50,750))
+myplot5<-myplot5+scale_y_continuous("Second Compo. of Seedlevel2 (selected)")
+myplot5<-myplot5+labs(title="Before and After Selection of Top 5 Seedlevel")
+myplot5<-myplot5+theme(legend.title = element_text(size=16),
+                       plot.title = element_text(lineheight=1.5, face="bold"),
+                       legend.text=element_text(size=12))
+myplot5
+
+###check immun gene list with lastest loading coefficients:
+cca_out_both$v[,1]->cca_immune_load1
+names(cca_immune_load1)<-colnames(cca_microarray_subjects)
+head(sort(cca_immune_load1,decr=T),10)
+tail(sort(cca_immune_load1,decr=T),10)
+@
+\end{document}
