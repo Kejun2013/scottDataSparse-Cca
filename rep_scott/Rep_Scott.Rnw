@@ -1558,9 +1558,13 @@ Ys=apply(Ys,1,mean,na.rm=TRUE)
 
 }#out of (0=="Kejun does not wanna that")
 
-#personal shift 
-samples_Loessed[,1:9]=samples_Loessed[,1:9]+(-.15)/2
-samples_Loessed[,10:22]=samples_Loessed[,10:22]-(-.15)/2
+
+##comment out this artifical shift from scott
+##comment out this artifical shift from scott
+#personal shift
+
+#samples_Loessed[,1:9]=samples_Loessed[,1:9]+(-.15)/2
+#samples_Loessed[,10:22]=samples_Loessed[,10:22]-(-.15)/2
 
 
 
@@ -2144,8 +2148,29 @@ par(mar=c(5,4,3,2))
 
 @
 
+  \subsection{Add on Mar 9 2015}
+  Average the genes with same neme.
+<<Mar 9 2015>>=
+dim(samples_Loessed)
+samples_Loessed_average<-samples_Loessed[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+unique_genes_Loessed<-unique(samples_Annotation_OGS_Loessed)
+for(i in unique_genes_Loessed){
+  j<-which(samples_Annotation_OGS_Loessed==i)
+  if(length(j)!=0){
+    samples_Loessed_average<-rbind(samples_Loessed_average,
+                                   colMeans(samples_Loessed_average[j,]))
+  }
+}
+samples_Loessed_average<-samples_Loessed_average[-(1:length(samples_Annotation_OGS_Loessed)),]
+rownames(samples_Loessed_average)<-unique_genes_Loessed
+samples_Loessed_average<-t(samples_Loessed_average)
+samples_Loessed_average<-samples_Loessed_average[,which(!is.na(colSums(samples_Loessed_average)))]
+rownames(samples_Loessed_average)<-rownames(t(SEED2_number_reads))
+@
+
   \subsection{Nov 9}
-  <<Nov.9,fig.align='center',fig.height=6,fig.width=7,echo=FALSE,results='markup'>>=
+  no need for the following subsection anymore. 
+  <<Nov.9,fig.align='center',fig.height=6,fig.width=7,echo=FALSE,results='markup',eval=FALSE>>=
 #need to intall bioconduct before PMA, otherwise cannot work
 if(0=="installed"){
   source("http://bioconductor.org/biocLite.R")
@@ -2197,7 +2222,7 @@ print(cca_out_FF,v=T)
 
  \subsection{Nov 16}
  ggplot the scatterplots of first components
- <<Nov 16,fig.align='center',fig.width=7,fig.height=6,echo=FALSE,results='hide'>>=
+ <<Nov 16,fig.align='center',fig.width=7,fig.height=6,echo=FALSE,results='hide',eval=FALSE>>=
 library(PMA)
 cca_permute_both<-CCA.permute(x=cca_seed2,z=cca_microarray_subjects,
                           typex="standard",typez="standard",nperms=7)

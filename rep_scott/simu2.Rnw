@@ -1,0 +1,2656 @@
+\documentclass[12pt]{article}
+\usepackage{amsmath,amsfonts}
+\usepackage{amsthm} 
+\usepackage[colorlinks=TRUE,urlcolor=blue,citecolor=blue,linkcolor=blue]{hyperref}
+\usepackage{geometry}
+ \geometry{
+ letterpaper,
+ left=15mm,
+ right=15mm,
+ top=20mm,
+ bottom=20mm,
+ }
+
+\usepackage[backend=bibtex]{biblatex}
+\bibliography{reference.bib,reference1.bib}
+
+\makeatletter
+% *, 1, 2, ...
+\renewcommand*{\@fnsymbol}[1]{\@arabic{#1}}
+\makeatother
+
+<<setup,include=FALSE>>=
+load("../rep_scott/.RData")
+knitr::opts_chunk$set(message=F,warning=F,out.weight="0.8\\textwidth",
+                      fig.width=9,fig.height=6,fig.lp='fig:',
+                      cache=TRUE,echo=F,comment=NA,
+                      fig.align='center')
+library(rgl)
+knitr::knit_hooks$set(rgl = function(before, options, envir) { 
+  # if a device was opened before this chunk, close it 
+  if (before && rgl.cur() > 0) rgl.close() 
+  hook_rgl(before, options, envir) 
+}) 
+# head(hook_rgl)  # the hook function is defined as this
+Sys.setenv(TEXINPUTS=getwd(),
+           BIBINPUTS=getwd(),
+           BSTINPUTS=getwd())
+@
+\begin{document}
+\title{Sparse Canonical Correlation Analysis Study: an Application in Gut Microbiota, Gene Expression Levels and Metabolite in Infants}
+
+\author{Kejun He\thanks{\baselineskip=10pt
+		%		Kejun He (Email: kejun@stat.tamu.edu) is PhD candidate, Jianhua Huang (Email: jianhua@stat.tamu.edu) is Professor, 
+		Department of Statistics, Texas A\&M University, College Station, TX 77843-3143. Huang's work was partially supported by NSF grant DMS 1208952.}~, Jianhua Z. Huang\footnotemark[1]~, Xiaoning Qian\thanks{Department of Electrical and Computer Engineering, Texas A\&M University, College Station, TX 77843, USA}~, Ulisses Braga-Neto\footnotemark[2]~,\\
+	Arghavan Bahadorinejad\footnotemark[2]~, Sharon M Donovan\thanks{Department of Food Science and Human Nutrition, 905 S. Goodwin Avenue, University of Illinois, Urbana, IL 61801, USA}~, Laurie A Davidson\thanks{Program in Integrative Nutrition \& Complex Diseases, Texas A\&M University, College Station, TX 77843, USA}~, \\
+	Ivan Ivanov\footnotemark[4]~$^{,}$\thanks{Correpondence: IIvanov@cvm.tamu.edu}~, Robert S. Chapkin\footnotemark[4]}
+\date{\today}
+  \maketitle
+
+\section{Introduction}
+The application of sparse canonical correlation analysis to genomic data analysis has been a growing research topic since 2008~\cite{waaijenborg2008quantifying},~\cite{witten2009extensions},~\cite{parkhomenko2009sparse}~\cite{lin2013group}. Most of these work focus on the relationships between gene expression levels with phenotype variations. However, there is a few work taking into account the relationship between host gene expression levels with the functions of gut microbiota. The work of~\cite{schwartz2012metagenomic} uses CCA framework to analyze these pair of data sets from infants with different feeding types. But the authors only chose 40 genes and 10 Seedlevel2s based on p-values of tests and diversity on the graphs, then they used every triple (3-member combination) from this 40-size bank and the 10 Seedlevel2 to run CCA and rank the results to get top ten genes and prove the existence of correlation. This framework has two defects. First, this method is in short of statistical interpretation, since it uses a two-stage analysis which makes the results sensitive to the variations of data and it looses the original meaning of CCA. Secondly, the computation cost of this framework is tremendous with $\mathcal{O}(n^3)$ complex. Thus the main purpose of this paper is applying sparse CCA method to the pair of host microarray data set and microbiol data set. The rest of the paper is organized as follows. In Section~\ref{sparse cca method}, we discuss the method of sparse canonical correlation analysis. In Section ~\ref{simulation results}, we compare sparse CCA method with the framework of~\cite{schwartz2012metagenomic} based on simulation methods. In Section~\ref{real data}, we apply the sparse CCA method to the data used by~\cite{schwartz2012metagenomic}, and we can find that this method can separate two groups of samples based on different feeding types. 
+
+\section{Sparse CCA Method} \label{sparse cca method}
+We consider the the first component of canonical correlation analysis (CCA) between two random vectors $\mathrm{x}=(x_1, x_2, \dots , x_p)^T$ and $\mathrm{y}=(y_1, y_2, \dots , y_q )^T$. CCA aims to find two projection directions $u_1 \in \mathbb{R}^p$ and $v_1 \in \mathbb{R}^q$ so that
+\begin{equation*}
+(u_1,v_1)=\underset{u,v}{\mbox{argmax}}\:\mbox{Corr}(u^Tx,v^Ty)=\underset{u,v}{\mbox{argmax}}\frac{u^T\Sigma_{xy}v}{\sqrt{(u^T\Sigma_{xx}u)(v^T\Sigma_{yy}v)}},
+\end{equation*}
+where $\Sigma_{xy}$, $\Sigma_{xx}$, $\Sigma_{yy}$ are covariance and variance matrices. This maximization is equivalent to 
+\begin{equation}
+\underset{u,v}{\mathrm{max}} \: u^T\Sigma_{xy}v, \quad \mbox{subject} \; \mathrm{to} \; u^T\Sigma_{xx}u=1 \; \mbox{and} \; v^T\Sigma_{yy}v=1 
+\end{equation}
+However, this objective function does not have closed solution when the sample size $n$ is less than $\min (p,q)$. Moreover, the result does not perform variable selection and hence usually lacks biological interpretability. Thus modern approaches usually take advantage of adding regularization conditions and using algorithms to obtain the sparse solution. Among all approaches, \cite{witten2009penalized} is proved to be a good solution with reasonable formulation and less computational cost. The main idea of this approach is that 
+\begin{align*}
+	\underset{u,v}{\mbox{max}} \quad & u^TX^TYv \\
+	\mbox{subject} \; \mbox{to} \quad & u^TX^TXu \leq 1 , \; v^TY^TYv \leq 1 \\
+	&  \|u\|_1 \leq c_1, \; \|v\|_1 \leq c_2, 
+\end{align*}
+where the tuning parameter $c_1$, $c_2$, are positive. It has been shown that in high-dimensional problems, treating the covariance matrix as diagonal can yield good results~\cite{witten2009penalized}, \cite{witten2009extensions}. Thus
+\begin{align*}
+	\underset{u,v}{\mbox{max}} \quad & u^TX^TYv \\
+	\mbox{subject} \; \mbox{to} \quad & \|v\|_2 \leq 1, \; \|u\|_2 \leq 1,\\
+	& \|u\|_1 \leq c_1, \; \|v\|_1 \leq c_2, 
+\end{align*}
+yield the first pair of sparse canonical correlation loadings. The algorithm to solve this optimization function is related with soft-thresholding and binary search~\cite{warde2010genemania}, the details can be found at~\cite{witten2009penalized}.
+\subsection{Selection of Tuning Parameters}
+In the current implementation of sparse CCA method, a pair of $(\lambda_X,\lambda_Y)$ consists the tuning parameters of sparsity. They are chosen with the most significant value from the permutation idea is from~\cite{Witten2013}. We first make a dense grid from $(0,1) \times (0,1)$ (values of both parameters are between $0$ and $1$). For each candidate pair values of tuning parameter,as the procedure given by \cite{Witten2013}, the following is performed: (1) The samples in $X$ are randomly permuted \textit{nperms} times (like the permutation test of existence of correlation, one and only one variable needs to be permuted, see~\cite[page 54]{pesarin2010permutation}), to obtain matrices $X^\ast_1,X^\ast_2,\dots$. (2) Sparse CCA is run on each permuted data set $(X^\ast_i,Y)$ to obtain factors $(u^\ast_i, v\ast_i)$. (3) Sparse CCA is run on the original data $(X,Y)$ to obtain factors $u$ and $v$. (4) Compute $c\ast_i=cor(X^\ast_i u^\ast_i,Y v^\ast_i)$ and $c=cor(Xu,Yv)$. (5) Use Fisher's transformation to convert these correlations into random variables that are approximately normally distributed. Let Fisher(c) denote the Fisher transformation of c. (6) Compute a z-statistic for Fisher(c), using $(Fisher(c)-\mathrm{mean}(Fisher(c^\ast)))/\mathrm{sd}(Fisher(c^\ast))$. After computing all these, we finally compare the z-statistic from each candidate pair values of tuning parameters, and the pair values of tuning parameters resulting in most significant z-statistic is chosen.
+
+\section{Simulation Results} \label{simulation results}
+There is a separate report including all the simulation results. It is necessary to discuss with Dr. Ivan Ivanov to decide which part should be included.
+\section{Real Data} \label{real data}
+<<Dr Qian needs second compo gene,eval=FALSE>>=
+colnames(cca_microarray_subjects)[order(abs(cca_out_both_2$v[,2]),decreasing=T)[1:10]]
+@
+We use this method to analyze the \texttt{immunology} related genes with \texttt{seedlevel2} microbial. As a result, we can have a look at top 10 features from the  \textit{Immunology} genes by sparse CCA method: \texttt{\Sexpr{colnames(cca_microarray_subjects)[order(abs(cca_out_both_2$v[,1]),decreasing=T)[1:10]]}} based on the first component loading (note that the total feature selection from the first component is \Sexpr{length(which(cca_out_both_2$v[,1]!=0))} out of \Sexpr{length(cca_out_both_2$v[,1])}), which are different from Scott's gene selection list on his page 8. And the 5 most ``correlated'' microbial species include ``\texttt{\Sexpr{colnames(cca_seed2)[order(abs(cca_out_both_2$u[,1]),decreasing=T)[1:5]]}}''. In addition, {\tt \Sexpr{colnames(cca_microarray_subjects)[order(abs(cca_out_both_2$v[,2]),decreasing=T)[1:10]]}} rank top ten from the second component of microarray. \\
+
+
+  <<sl2,out.weight="0.8\\textwidth",fig.width=9,fig.height=6,echo=FALSE,fig.cap="\\scriptsize CCA plot by canonical component scores of Seedlevel2 categories.",fig.lp='fig:'>>=
+myplot1_2
+#myplot3
+#myplot5
+@
+
+<<imm,out.weight="0.8\\textwidth",fig.width=9,fig.height=6,echo=FALSE,fig.cap="\\scriptsize CCA plot by canonical component scores of \\textit{Immunology} gene expression.",fig.lp='fig:'>>=
+myplot2_2
+@
+\noindent I try to visualize the distributions of different samples based on computed CCA scores. First, we plot the samples in Fig.~\ref{fig:sl2} based on the first and second canonical component scores of Seedlevel2 from microbial data. These samples are also colored based on the first canonical component scores of \textit{Immunology} from host microarray data. In addition, the samples from breastfed and formula groups are also marked by different shapes. In this plot, two samples BMS8 and FF13 appear to be not well separated as the general trend. However, when we look the first canonical component scores of \textit{Immunology}, samples seem to be well separated, which seems to indicate that the identified genes may be significantly affected by feeding types through microbial interactions. To further illustrate the separation, we re-plot the samples in Fig.~\ref{fig:imm} based on the based on the first and second canonical component scores of \textit{Immunology} gene expressions with color changing based on the first canonical component scores of Seedlevel2 categories. It is clear that feeding types separate these sample quite well.   \par
+We can also have a look at the mean and standard deviation of the scores from different feeding type.
+\\
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from Immunology & \Sexpr{mean(cca_scores_2$V1[1:6])} & \Sexpr{sd(cca_scores_2$V1[1:6])} & \Sexpr{mean(cca_scores_2$V1[7:12])} & \Sexpr{sd(cca_scores_2$V1[7:12])}\\
+\hline
+Second Component Scores from Immunology & \Sexpr{mean(cca_scores_2$V2[1:6])} & \Sexpr{sd(cca_scores_2$V2[1:6])} & \Sexpr{mean(cca_scores_2$V2[7:12])} & \Sexpr{sd(cca_scores_2$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(cca_scores_2$U1[1:6])} & \Sexpr{sd(cca_scores_2$U1[1:6])} & \Sexpr{mean(cca_scores_2$U1[7:12])} & \Sexpr{sd(cca_scores_2$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(cca_scores_2$U2[1:6])} & \Sexpr{sd(cca_scores_2$U2[1:6])} & \Sexpr{mean(cca_scores_2$U2[7:12])} & \Sexpr{sd(cca_scores_2$U2[7:12])}\\
+\hline
+\end{tabular}
+
+\section{Sparse PCA}
+<<just plots,cache=FALSE,fig.cap=c("\\scriptsize This plot shows the first two sparse PCA scores of host gene expression levels of 12 samples with two different feeding types.","\\scriptsize This plot shows the first two sparse PCA scores of gut microbiol data of 12 samples with two different feeding types.")>>=
+spca_plot1
+spca_plot2
+@
+As a comparison, we can also apply sparse PCA method on both host genes expression levels and gut microbiota data. As we can see,~\ref{fig:just plots1} and~\ref{fig:just plots2} show that without association between these two data sets, the sparse PCA method cannot separate two groups as good as sparse CCA method.
+
+\section{Detecting Specific Genes from other Lists}
+We first have a look at the list of {\it Immunity and defense}. And try to use the overall gene list.
+<<Finding genes,echo=TRUE>>=
+obj_gene<-c("GPR41","FFAR3","GPR43","FFAR2")
+obj_gene %in% samples_Annotation_OGS_Loessed
+length(samples_Annotation_OGS_Loessed)
+
+obj_gene %in% samples_Annotation_OGS_Loessed_Immuno
+obj_gene %in% samples_Annotation_OGS_Loessed_Intest
+
+obj_micro<-"SCFA"
+grep(obj_micro,colnames(cca_seed2))
+@
+Calculation code is skipped.
+<<Finding genes2,results='hide'>>=
+cca_microarray_all<-samples_Loessed[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+cca_microarray_all<-t(cca_microarray_all)
+dim(cca_microarray_all)
+rownames(cca_microarray_all)<-rownames(cca_seed2)
+colnames(cca_microarray_all)<-samples_Annotation_OGS_Loessed
+cca_microarray_all<-cca_microarray_all[,colSums(is.na(cca_microarray_all))==0]
+dim(cca_microarray_all)
+obj_gene %in% colnames(cca_microarray_all)
+
+##cca:
+library(PMA)
+gene_list<-NULL;
+cca_permute<-CCA.permute(x=cca_microarray_all,
+                           z=cca_seed2,# order switch from my original
+                           typex="standard",typez="standard",
+                           nperms=40)
+best_x_pen<-cca_permute$bestpenaltyx
+best_z_pen<-cca_permute$bestpenaltyz
+cca_result<-CCA(x=cca_microarray_all,
+                z=cca_seed2,# order switch from my original
+                penaltyx=best_x_pen, penaltyz=best_z_pen,
+                xnames=colnames(cca_microarray_all),
+                znames=colnames(cca_seed2))
+gene_list<-cca_result$u
+rownames(gene_list)<-colnames(cca_microarray_all)
+@
+
+<<Finding genes3,results='hide'>>=
+##cca for intestinal
+cca_microarray_Intest<-samples_Loessed_Intest[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+cca_microarray_Intest<-t(cca_microarray_Intest)
+dim(cca_microarray_Intest)
+rownames(cca_microarray_Intest)<-rownames(cca_seed2)
+colnames(cca_microarray_Intest)<-samples_Annotation_OGS_Loessed_Intest
+cca_microarray_Intest<-cca_microarray_Intest[,colSums(is.na(cca_microarray_Intest))==0]
+dim(cca_microarray_Intest)
+obj_gene %in% colnames(cca_microarray_Intest)
+
+library(PMA)
+cca_permute_Intest<-CCA.permute(x=cca_microarray_Intest,
+                           z=cca_seed2,# order switch from my original
+                           typex="standard",typez="standard",
+                           nperms=40)
+best_x_pen_Intest<-cca_permute_Intest$bestpenaltyx
+best_z_pen_Intest<-cca_permute_Intest$bestpenaltyz
+cca_result_Intest<-CCA(x=cca_microarray_Intest,
+                z=cca_seed2,# order switch from my original
+                penaltyx=best_x_pen_Intest, penaltyz=best_z_pen_Intest,
+                xnames=colnames(cca_microarray_Intest),
+                znames=colnames(cca_seed2))
+gene_list_Intest<-cca_result_Intest$u
+rownames(gene_list_Intest)<-colnames(cca_microarray_Intest)
+@
+Results are not satisfied. It is mainly because that the sample size is too small. In {\it simulation Study} section, we will give more details.
+<<Finding genes4,echo=TRUE>>=
+gene_list<-gene_list[gene_list[,1]!=0,1]
+obj_gene %in% names(gene_list)
+
+order_gene_list<-sort(abs(gene_list),decreasing = T)
+length(order_gene_list)
+
+which(names(order_gene_list)==obj_gene[1])/length(order_gene_list)
+
+
+gene_list_Intest<-gene_list_Intest[gene_list_Intest[,1]!=0,1]
+obj_gene %in% names(gene_list_Intest)
+@
+
+\subsection{Energy Sensing}
+We then turn to check {\it Energy sensing}.
+<<Finding Energy Sensing>>=
+if(!("xlsx" %in% installed.packages())) install.packages("xlsx")
+library(xlsx)
+Energy_sensing_list<-read.xlsx("../Human Colonic Biomarkers_022415.xlsx",1,
+                               start=3267,end=3274,header=F)
+Energy_sensing_list<-as.character(Energy_sensing_list$X4)
+Energy_sensing_prob<-which(samples_Annotation_OGS_Loessed %in% Energy_sensing_list)
+length(Energy_sensing_prob)
+#only one
+@
+But there is only \Sexpr{length(Energy_sensing_prob)} gene with good discover quality and without miss values.
+
+\subsection{The Barrier genes}
+For {\it Barrier}, the result is much better.
+<<Barrier,results='hide'>>=
+#Barrier:
+Barrier_list<-read.xlsx("../Human Colonic Biomarkers_022415.xlsx",1,
+                        start=3226,end=3264,header=F)
+Barrier_list<-as.character(unique(Barrier_list$X4))
+# Barrier_prob<-which(samples_Annotation_OGS_Loessed %in% Barrier_list)
+# samples_Loessed_Barrier<-samples_Loessed[Barrier_prob,]
+# cca_Barrier_subjects<-samples_Loessed_Barrier[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+# #exclude the NA:
+# Barrier_prob<-Barrier_prob[which(!is.na(rowSums(samples_Loessed_Barrier)))]
+# #after excluding the NA, redefine the data set:
+# samples_Loessed_Barrier<-samples_Loessed[Barrier_prob,]
+# cca_Barrier_subjects<-samples_Loessed_Barrier[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+# samples_Annotation_OGS_Loessed_Barrier<-samples_Annotation_OGS_Loessed[Barrier_prob]
+# cca_Barrier_subjects<-t(cca_Barrier_subjects)
+# rownames(cca_Barrier_subjects)<-rownames(cca_seed2)
+# colnames(cca_Barrier_subjects)<-samples_Annotation_OGS_Loessed_Barrier
+
+## after taking average of loessed data:
+Barrier_prob<-which(colnames(samples_Loessed_average) %in% Barrier_list)
+cca_Barrier_subjects<-samples_Loessed_average[,Barrier_prob]
+#CCA for Barrier:
+if(!("PMA") %in% installed.packages()){
+  source("http://bioconductor.org/biocLite.R")
+  biocLite("impute")
+  install.packages("PMA")
+}
+library(PMA)
+set.seed(1221)
+cca_Barrier_permute<-CCA.permute(x=cca_seed2,z=cca_Barrier_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=100)
+Barrier_penaltyx<-cca_Barrier_permute$bestpenaltyx
+Barrier_penaltyz<-cca_Barrier_permute$bestpenaltyz
+cca_Barrier<-CCA(x=cca_seed2,z=cca_Barrier_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(cca_seed2),min=20),
+                 znames=colnames(cca_Barrier_subjects),
+               #  penaltyx=Barrier_penaltyx,penaltyz=Barrier_penaltyz,
+                 K=2,niter=100)
+colnames(cca_Barrier_subjects)[which(cca_Barrier$v[,1]!=0)]
+colnames(cca_Barrier_subjects)[which(cca_Barrier$v[,2]!=0)]
+@
+There are $\Sexpr{dim(cca_Barrier_subjects)[2]}$ genes can be used to run sparse CCA with $\Sexpr{dim(cca_seed2)[2]}$ Seedlevel2 microbial community. And sparse CCA results in detecting $\Sexpr{length(which(cca_Barrier$v[,1]!=0))}$ genes, which are {\it \Sexpr{colnames(cca_Barrier_subjects)[which(cca_Barrier$v[,1]!=0)]}}, and $\Sexpr{length(which(cca_Barrier$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_Barrier_subjects)[which(cca_Barrier$v[,2]!=0)]}}. Then let's check the sparse CCA scores plots and sparse PCA plot of {\it Barrier} to see whether Sparse CCA with the knowledge of {\it seedlevel2} can enhance the separation.  
+
+<<Barrier Graphics,results='hide'>>=
+#graphs:
+cca_Barrier_u<-cca_seed2%*%cca_Barrier$u
+cca_Barrier_v<-cca_Barrier_subjects%*%cca_Barrier$v
+cca_Barrier_scores<-cbind(cca_Barrier_u,cca_Barrier_v)
+colnames(cca_Barrier_scores)<-c("U1","U2","V1","V2")
+cca_Barrier_scores<-as.data.frame(cca_Barrier_scores)
+cca_Barrier_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca_Barrier_plot2<-ggplot(cca_Barrier_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca_Barrier_plot2<-cca_Barrier_plot2+geom_point(size=4)
+cca_Barrier_plot2<-cca_Barrier_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+cca_Barrier_plot2<-cca_Barrier_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca_Barrier_plot2<-cca_Barrier_plot2+geom_text(aes(label=rownames(cca_Barrier_scores)),col="black",hjust=1.1,size=5)
+cca_Barrier_plot2<-cca_Barrier_plot2+scale_x_continuous("First Component Scores of Barrier")
+cca_Barrier_plot2<-cca_Barrier_plot2+scale_y_continuous("Second Component Scores of Barrier")
+cca_Barrier_plot2<-cca_Barrier_plot2+labs(title="Sparse CCA Scores for Barrier as Base")
+cca_Barrier_plot2<-cca_Barrier_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+# setInternet2(T) ## to make https work
+source("../stat-ellipse.R")
+cca_Barrier_plot2<-cca_Barrier_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca_Barrier_plot2<-cca_Barrier_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_Barrier_special1<-cca_Barrier_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_Barrier_special1[t,3:4]<-cca_Barrier_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_Barrier_plot2<-cca_Barrier_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_Barrier_special1,
+#                                     alpha=0.2,linetype=0)
+cca_Barrier_plot2
+
+# the other cca graph:
+cca_Barrier_plot1<-ggplot(cca_Barrier_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca_Barrier_plot1<-cca_Barrier_plot1+geom_point(size=4,
+                                                position=position_jitter(height=20,width=20))
+cca_Barrier_plot1<-cca_Barrier_plot1+scale_colour_continuous(name="First Component\nScores of Barrier",low="blue",high="red")
+cca_Barrier_plot1<-cca_Barrier_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca_Barrier_plot1<-cca_Barrier_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4,
+                                               position=position_jitter(height=20,width=20))
+cca_Barrier_plot1<-cca_Barrier_plot1+scale_x_continuous("First Component Scores of Seedlevel2")
+cca_Barrier_plot1<-cca_Barrier_plot1+scale_y_continuous("Second Component Scores of Seedlevel2")
+cca_Barrier_plot1<-cca_Barrier_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+cca_Barrier_plot1<-cca_Barrier_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca_Barrier_plot1<-cca_Barrier_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+# cca_Barrier_special2<-cca_Barrier_scores[rep(c(4,5,6,8),each=100),]
+# for(t in 1:(100*4)){
+#  cca_Barrier_special2[t,1:2]<-cca_Barrier_special2[t,1:2]+c(sin(t*2*pi/100)*50,cos(t*2*pi/100)*25)
+# }
+# for(t in 1:4){
+#   cca_Barrier_plot1<-cca_Barrier_plot1+geom_polygon(aes(x=U1,y=U2,fill=type),
+#                                                     cca_Barrier_special2[seq(t*100-99,t*100,by=1),],
+#                                                     alpha=0.2,linetype=0)
+# }
+cca_Barrier_plot1<-cca_Barrier_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+cca_Barrier_plot1
+
+# Barrier sparse PCA plot/ the spca plot for seedlevel2 has been given before
+# Barrier sparse PCA plot/ the spca plot for seedlevel2 has been given before
+# Barrier sparse PCA plot/ the spca plot for seedlevel2 has been given before
+spca_Barrier_cv<-SPC.cv(x=cca_Barrier_subjects,sumabsvs=seq(1,sqrt(18),by=0.1),
+                      nfolds=10,niter=50)
+spca_Barrier<-SPC(x=cca_Barrier_subjects,sumabsv=spca_Barrier_cv$bestsumabsv,
+                K=2,niter=20)
+spca_Barrier_scores<-spca_Barrier$u
+rownames(spca_Barrier_scores)<-rownames(cca_Barrier_subjects)
+spca_Barrier_scores<-as.data.frame(spca_Barrier_scores)
+names(spca_Barrier_scores)<-c("Host1","Host2")
+spca_Barrier_scores$type<-c(rep("BF",6),rep("FF",6))
+library(ggplot2)
+spca_Barrier_plot1<-ggplot(spca_Barrier_scores,aes(x=Host1,y=Host2,shape=type,colour=type,
+                                   ymax=max(abs(Host2))*1.5))
+spca_Barrier_plot1<-spca_Barrier_plot1+geom_point(size=4)
+spca_Barrier_plot1<-spca_Barrier_plot1+scale_shape_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+spca_Barrier_plot1<-spca_Barrier_plot1+scale_color_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+spca_Barrier_plot1<-spca_Barrier_plot1+geom_text(aes(label=rownames(spca_Barrier_scores)),
+                                 col="black",hjust=1.1,size=4,
+                                 position=position_jitter(height=0.01,width=0.01))
+## the position=position_jitter(height=0.01,width=0.01) will make the material in the same group 
+# a litter bit separate.
+## wihle position_dodge will separate the material between groups.
+spca_Barrier_plot1<-spca_Barrier_plot1+scale_x_continuous("First PCA Scores of Hosts")
+spca_Barrier_plot1<-spca_Barrier_plot1+scale_y_continuous("Second PCA Scores of Hosts")
+spca_Barrier_plot1<-spca_Barrier_plot1+labs(title="Sparse PCA Scores from Barrier of Hosts")
+spca_Barrier_plot1<-spca_Barrier_plot1+theme(legend.title=element_text(size=10),
+                             legend.text=element_text(size=8),
+                             plot.title=element_text(size=14,vjust=1.1,face="bold"))
+#source("https://raw.github.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+spca_Barrier_plot1<-spca_Barrier_plot1+stat_ellipse(aes(x=Host1,y=Host2,fill=type),
+                                    level=0.8,geom="polygon",alpha=0.2)
+spca_Barrier_plot1<-spca_Barrier_plot1+scale_fill_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+# add one special location:
+spca_Barrier_special<-spca_Barrier_scores[rep(11,100),]
+for(t in 1:100){
+ spca_Barrier_special[t,1:2]<-spca_Barrier_special[t,1:2]+c(sin(t*2*pi/100)/40,cos(t*2*pi/100)/20)
+}
+spca_Barrier_plot1<-spca_Barrier_plot1+geom_polygon(aes(x=Host1,y=Host2,fill=type),
+                                                    spca_Barrier_special,alpha=0.2)
+spca_Barrier_special2<-spca_Barrier_scores[rep(6,100),]
+for(t in 1:100){
+ spca_Barrier_special2[t,1:2]<-spca_Barrier_special2[t,1:2]+c(sin(t*2*pi/100)/40,cos(t*2*pi/100)/20)
+}
+spca_Barrier_plot1<-spca_Barrier_plot1+geom_polygon(aes(x=Host1,y=Host2,fill=type),
+                                                    spca_Barrier_special2,alpha=0.2)
+
+spca_Barrier_plot1
+@
+Also, we can summary the scores as follows: \\
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from Barrier & \Sexpr{mean(cca_Barrier_scores$V1[1:6])} & \Sexpr{sd(cca_Barrier_scores$V1[1:6])} & \Sexpr{mean(cca_Barrier_scores$V1[7:12])} & \Sexpr{sd(cca_Barrier_scores$V1[7:12])}\\
+\hline
+Second Component Scores from Barrier & \Sexpr{mean(cca_Barrier_scores$V2[1:6])} & \Sexpr{sd(cca_Barrier_scores$V2[1:6])} & \Sexpr{mean(cca_Barrier_scores$V2[7:12])} & \Sexpr{sd(cca_Barrier_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(cca_Barrier_scores$U1[1:6])} & \Sexpr{sd(cca_Barrier_scores$U1[1:6])} & \Sexpr{mean(cca_Barrier_scores$U1[7:12])} & \Sexpr{sd(cca_Barrier_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(cca_Barrier_scores$U2[1:6])} & \Sexpr{sd(cca_Barrier_scores$U2[1:6])} & \Sexpr{mean(cca_Barrier_scores$U2[7:12])} & \Sexpr{sd(cca_Barrier_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+
+\subsection{Gut Function}
+For the {\it Gut Function}, we do the same experiment. 
+<<Gut Function>>=
+if(!("xlsx" %in% installed.packages())) install.packages("xlsx")
+library(xlsx)
+Gut_list<-read.xlsx("../Human Colonic Biomarkers_022415.xlsx",1,
+                        start=3277,end=3281,header=F)
+Gut_list<-as.character(unique(Gut_list$X4))
+Gut_prob<-which(samples_Annotation_OGS_Loessed %in% Gut_list)
+samples_Loessed_Gut<-samples_Loessed[Gut_prob,]
+cca_Gut_subjects<-samples_Loessed_Gut[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+#exclude the NA:
+Gut_prob<-Gut_prob[which(!is.na(rowSums(samples_Loessed_Gut)))]
+#after excluding the NA, redefine the data set:
+samples_Loessed_Gut<-samples_Loessed[Gut_prob,]
+cca_Gut_subjects<-samples_Loessed_Gut[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+samples_Annotation_OGS_Loessed_Gut<-samples_Annotation_OGS_Loessed[Gut_prob]
+cca_Gut_subjects<-t(cca_Gut_subjects)
+rownames(cca_Gut_subjects)<-rownames(cca_seed2)
+colnames(cca_Gut_subjects)<-samples_Annotation_OGS_Loessed_Gut
+@
+But we again cannot do further detection with sparse CCA, since there is no gene to be used with good quality in this gene list. 
+
+\subsection{SMD genes list}
+ For the {\it SMD}, we do the same experiment.
+<<SMD,eval=TRUE,results='hide'>>=
+#SMD:
+SMD_list<-read.xlsx("../Gene list_SMD.xlsx",1,
+                        start=38,end=73,header=F)
+SMD_list<-as.character(unique(SMD_list$X1))
+# SMD_prob<-which(samples_Annotation_OGS_Loessed %in% SMD_list)
+# samples_Loessed_SMD<-samples_Loessed[SMD_prob,]
+# cca_SMD_subjects<-samples_Loessed_SMD[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+# #exclude the NA:
+# SMD_prob<-SMD_prob[which(!is.na(rowSums(samples_Loessed_SMD)))]
+# #after excluding the NA, redefine the data set:
+# samples_Loessed_SMD<-samples_Loessed[SMD_prob,]
+# cca_SMD_subjects<-samples_Loessed_SMD[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+# samples_Annotation_OGS_Loessed_SMD<-samples_Annotation_OGS_Loessed[SMD_prob]
+# cca_SMD_subjects<-t(cca_SMD_subjects)
+# rownames(cca_SMD_subjects)<-rownames(cca_seed2)
+# colnames(cca_SMD_subjects)<-samples_Annotation_OGS_Loessed_SMD
+
+cca_SMD_subjects<-samples_Loessed_average[,which(colnames(samples_Loessed_average) %in%
+                                                             SMD_list)]
+
+
+#CCA for SMD:
+if(!("PMA") %in% installed.packages()){
+  source("http://bioconductor.org/biocLite.R")
+  biocLite("impute")
+  install.packages("PMA")
+}
+library(PMA)
+cca_SMD_permute<-CCA.permute(x=cca_seed2,z=cca_SMD_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+SMD_penaltyx<-cca_SMD_permute$bestpenaltyx
+SMD_penaltyz<-cca_SMD_permute$bestpenaltyz
+cca_SMD<-CCA(x=cca_seed2,z=cca_SMD_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(cca_seed2),min=20),
+                 znames=colnames(cca_SMD_subjects),
+               #  penaltyx=SMD_penaltyx,penaltyz=SMD_penaltyz,
+                 K=2)
+colnames(cca_SMD_subjects)[which(cca_SMD$v[,1]!=0)]
+colnames(cca_SMD_subjects)[which(cca_SMD$v[,2]!=0)]
+@
+
+There are $\Sexpr{dim(cca_SMD_subjects)[2]}$ genes can be used to run sparse CCA with $\Sexpr{dim(cca_seed2)[2]}$ Seedlevel2 microbial community. And sparse CCA results in detecting $\Sexpr{length(which(cca_SMD$v[,1]!=0))}$ genes in the first component, which are {\it \Sexpr{colnames(cca_SMD_subjects)[which(cca_SMD$v[,1]!=0)]}}, and $\Sexpr{length(which(cca_SMD$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_SMD_subjects)[which(cca_SMD$v[,2]!=0)]}}. Then let's check the sparse CCA scores plots and sparse PCA plot of {\it SMD} to see whether Sparse CCA with the knowledge of {\it seedlevel2} can enhance the separation.  
+
+<<SMD Graphics,results='hide',eval=TRUE>>=
+#graphs:
+cca_SMD_u<-cca_seed2%*%cca_SMD$u
+cca_SMD_v<-cca_SMD_subjects%*%cca_SMD$v
+cca_SMD_scores<-cbind(cca_SMD_u,cca_SMD_v)
+colnames(cca_SMD_scores)<-c("U1","U2","V1","V2")
+cca_SMD_scores<-as.data.frame(cca_SMD_scores)
+cca_SMD_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca_SMD_plot2<-ggplot(cca_SMD_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca_SMD_plot2<-cca_SMD_plot2+geom_point(size=4)
+cca_SMD_plot2<-cca_SMD_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",
+                                                     low="blue",high="red")
+cca_SMD_plot2<-cca_SMD_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca_SMD_plot2<-cca_SMD_plot2+geom_text(aes(label=rownames(cca_SMD_scores)),col="black",
+                                       hjust=1.1,size=5)
+cca_SMD_plot2<-cca_SMD_plot2+scale_x_continuous("First Component Scores of SMD")
+cca_SMD_plot2<-cca_SMD_plot2+scale_y_continuous("Second Component Scores of SMD")
+cca_SMD_plot2<-cca_SMD_plot2+labs(title="Sparse CCA Scores for SMD as Base")
+cca_SMD_plot2<-cca_SMD_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+#setInternet2(T) ## to make https work
+#source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+cca_SMD_plot2<-cca_SMD_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca_SMD_plot2<-cca_SMD_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+#cca_SMD_special1<-cca_SMD_scores[rep(5,100),]
+#for(t in 1:100){
+# cca_SMD_special1[t,3:4]<-cca_SMD_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+#}
+#cca_SMD_plot2<-cca_SMD_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_SMD_special1,
+#                                    alpha=0.2,linetype=0)
+cca_SMD_plot2
+
+# the other cca graph:
+cca_SMD_plot1<-ggplot(cca_SMD_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca_SMD_plot1<-cca_SMD_plot1+geom_point(size=4)
+cca_SMD_plot1<-cca_SMD_plot1+scale_colour_continuous(name="First Component\nScores of SMD",
+                                                     low="blue",high="red")
+cca_SMD_plot1<-cca_SMD_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca_SMD_plot1<-cca_SMD_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+cca_SMD_plot1<-cca_SMD_plot1+scale_x_continuous("First Component Scores of Seedlevel2")
+cca_SMD_plot1<-cca_SMD_plot1+scale_y_continuous("Second Component Scores of Seedlevel2")
+cca_SMD_plot1<-cca_SMD_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+cca_SMD_plot1<-cca_SMD_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca_SMD_plot1<-cca_SMD_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#cca_SMD_special2<-cca_SMD_scores[rep(c(5,6,10,12),each=100),]
+#for(t in 1:(100*4)){
+# cca_SMD_special2[t,1:2]<-cca_SMD_special2[t,1:2]+c(sin(t*2*pi/100)*50,cos(t*2*pi/100)*25)
+#}
+#for(t in 1:4){
+#  cca_SMD_plot1<-cca_SMD_plot1+geom_polygon(aes(x=U1,y=U2,fill=type),
+#                                                    cca_SMD_special2[seq(t*100-99,t*100,by=1),],
+#                                                    alpha=0.2,linetype=0)
+#}
+cca_SMD_plot1<-cca_SMD_plot1+scale_fill_discrete(name="Feeding Type",
+                                         labels=c("Breastfed","Formula-fed"))
+cca_SMD_plot1
+
+# SMD sparse PCA plot/ the spca plot for seedlevel2 has been given before
+# SMD sparse PCA plot/ the spca plot for seedlevel2 has been given before
+# SMD sparse PCA plot/ the spca plot for seedlevel2 has been given before
+spca_SMD_cv<-SPC.cv(x=cca_SMD_subjects,sumabsvs=seq(1,sqrt(13),by=0.1),
+                      nfolds=10,niter=10)
+spca_SMD<-SPC(x=cca_SMD_subjects,sumabsv=spca_SMD_cv$bestsumabsv,
+                K=2)
+spca_SMD_scores<-spca_SMD$u
+rownames(spca_SMD_scores)<-rownames(cca_SMD_subjects)
+spca_SMD_scores<-as.data.frame(spca_SMD_scores)
+names(spca_SMD_scores)<-c("Host1","Host2")
+spca_SMD_scores$type<-c(rep("BF",6),rep("FF",6))
+library(ggplot2)
+spca_SMD_plot1<-ggplot(spca_SMD_scores,aes(x=Host1,y=Host2,shape=type,colour=type,
+                                   ymax=max(abs(Host2))*1.5))
+spca_SMD_plot1<-spca_SMD_plot1+geom_point(size=4)
+spca_SMD_plot1<-spca_SMD_plot1+scale_shape_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+spca_SMD_plot1<-spca_SMD_plot1+scale_color_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+spca_SMD_plot1<-spca_SMD_plot1+geom_text(aes(label=rownames(spca_SMD_scores)),
+                                 col="black",hjust=1.1,size=4,
+                                 position=position_jitter(height=0.01,width=0.01))
+## the position=position_jitter(height=0.01,width=0.01) will make the material in the same group 
+# a litter bit separate.
+## wihle position_dodge will separate the material between groups.
+spca_SMD_plot1<-spca_SMD_plot1+scale_x_continuous("First PCA Scores of Hosts")
+                                                
+spca_SMD_plot1<-spca_SMD_plot1+scale_y_continuous("Second PCA Scores of Hosts")
+spca_SMD_plot1<-spca_SMD_plot1+labs(title="Sparse PCA Scores from SMD of Hosts")
+spca_SMD_plot1<-spca_SMD_plot1+theme(legend.title=element_text(size=10),
+                             legend.text=element_text(size=8),
+                             plot.title=element_text(size=14,vjust=1.1,face="bold"))
+#source("https://raw.github.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+spca_SMD_plot1<-spca_SMD_plot1+stat_ellipse(aes(x=Host1,y=Host2,fill=type),
+                                    level=0.8,geom="polygon",alpha=0.2)
+spca_SMD_plot1<-spca_SMD_plot1+scale_fill_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+# add one special location:
+# spca_SMD_special<-spca_SMD_scores[rep(6,100),]
+# for(t in 1:100){
+#  spca_SMD_special[t,1:2]<-spca_SMD_special[t,1:2]+c(sin(t*2*pi/100)/30,cos(t*2*pi/100)/30)
+# }
+# spca_SMD_plot1<-spca_SMD_plot1+geom_polygon(aes(x=Host1,y=Host2,fill=type),
+#                                                     spca_SMD_special,alpha=0.2)
+# spca_SMD_special2<-spca_SMD_scores[rep(11,100),]
+# for(t in 1:100){
+#  spca_SMD_special2[t,1:2]<-spca_SMD_special2[t,1:2]+c(sin(t*2*pi/100)/30,cos(t*2*pi/100)/30)
+# }
+# spca_SMD_plot1<-spca_SMD_plot1+geom_polygon(aes(x=Host1,y=Host2,fill=type),
+#                                                     spca_SMD_special2,alpha=0.2)
+spca_SMD_plot1
+@
+Also, we can summary the scores as follows: \\
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from SMD & \Sexpr{mean(cca_SMD_scores$V1[1:6])} & \Sexpr{sd(cca_SMD_scores$V1[1:6])} & \Sexpr{mean(cca_SMD_scores$V1[7:12])} & \Sexpr{sd(cca_SMD_scores$V1[7:12])}\\
+\hline
+Second Component Scores from SMD & \Sexpr{mean(cca_SMD_scores$V2[1:6])} & \Sexpr{sd(cca_SMD_scores$V2[1:6])} & \Sexpr{mean(cca_SMD_scores$V2[7:12])} & \Sexpr{sd(cca_SMD_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(cca_SMD_scores$U1[1:6])} & \Sexpr{sd(cca_SMD_scores$U1[1:6])} & \Sexpr{mean(cca_SMD_scores$U1[7:12])} & \Sexpr{sd(cca_SMD_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(cca_SMD_scores$U2[1:6])} & \Sexpr{sd(cca_SMD_scores$U2[1:6])} & \Sexpr{mean(cca_SMD_scores$U2[7:12])} & \Sexpr{sd(cca_SMD_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+\subsection{SCFA related genes}
+
+<<SCFA,results='hide'>>=
+SCFA_list<-read.csv("../2015_3_7_jknight_scfa_gene_list.csv",header=F)
+SCFA_list<-as.character(unique(SCFA_list$V1))
+# SCFA_prob<-which(samples_Annotation_OGS_Loessed %in% SCFA_list)
+# samples_Loessed_SCFA<-samples_Loessed[SCFA_prob,]
+# 
+# cca_SCFA_subjects<-samples_Loessed_SCFA[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+# #exclude the NA:
+# SCFA_prob<-SCFA_prob[which(!is.na(rowSums(samples_Loessed_SCFA)))]
+# #after excluding the NA, redefine the data set:
+# samples_Loessed_SCFA<-samples_Loessed[SCFA_prob,]
+# cca_SCFA_subjects<-samples_Loessed_SCFA[c(20,22,19,14,12,17,3,4,9,5,7,2)]
+# samples_Annotation_OGS_Loessed_SCFA<-samples_Annotation_OGS_Loessed[SCFA_prob]
+# cca_SCFA_subjects<-t(cca_SCFA_subjects)
+# cca_SCFA_subjects<-as.data.frame(cca_SCFA_subjects)
+# ## to deal with same named genes:
+# ## to deal with same named genes:
+# unique_SCFA_names<-unique(samples_Annotation_OGS_Loessed_SCFA)
+# for(i in unique_SCFA_names){
+#   j<-which(samples_Annotation_OGS_Loessed_SCFA==i)
+#   cca_SCFA_subjects<-cbind(cca_SCFA_subjects,
+#               rowMeans(cca_SCFA_subjects[j]))
+#   }
+# cca_SCFA_subjects<-cca_SCFA_subjects[,-(1:length(samples_Annotation_OGS_Loessed_SCFA))]
+# rownames(cca_SCFA_subjects)<-rownames(cca_seed2)
+# colnames(cca_SCFA_subjects)<-unique_SCFA_names
+#out of same named genes
+
+cca_SCFA_subjects<-samples_Loessed_average[,which(colnames(samples_Loessed_average) %in%
+                                                             SCFA_list)]
+
+#CCA for SCFA:
+if(!("PMA") %in% installed.packages()){
+  source("http://bioconductor.org/biocLite.R")
+  biocLite("impute")
+  install.packages("PMA")
+}
+library(PMA)
+cca_SCFA_permute<-CCA.permute(x=cca_seed2,z=cca_SCFA_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50,nperms=50)
+SCFA_penaltyx<-cca_SCFA_permute$bestpenaltyx
+SCFA_penaltyz<-cca_SCFA_permute$bestpenaltyz
+cca_SCFA<-CCA(x=cca_seed2,z=cca_SCFA_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(cca_seed2),min=20),
+                 znames=colnames(cca_SCFA_subjects),
+                 penaltyx=SCFA_penaltyx,penaltyz=SCFA_penaltyz,
+                 K=2)
+colnames(cca_SCFA_subjects)[which(cca_SCFA$v[,1]!=0)]
+colnames(cca_SCFA_subjects)[which(cca_SCFA$v[,2]!=0)]
+@
+
+There are $\Sexpr{dim(cca_SCFA_subjects)[2]}$ genes can be used to run sparse CCA with $\Sexpr{dim(cca_seed2)[2]}$ Seedlevel2 microbial community. And sparse CCA results in detecting $\Sexpr{length(which(cca_SCFA$v[,1]!=0))}$ genes in the first component, which are {\it \Sexpr{colnames(cca_SCFA_subjects)[which(cca_SCFA$v[,1]!=0)]}}, and $\Sexpr{length(which(cca_SCFA$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_SCFA_subjects)[which(cca_SCFA$v[,2]!=0)]}}. Then let's check the sparse CCA scores plots and sparse PCA plot of {\it SCFA} to see whether Sparse CCA with the knowledge of {\it seedlevel2} can enhance the separation.  
+
+<<SCFA Graphics,fig.cap=c("\\scriptsize The first two sparse CCA components scores of SCFA related host gene expression levels of 12 samples from two different feeding types","\\scriptsize The first two sparse CCA components scores of gut microbiota data of 12 samples from two different feeding types","\\scriptsize The first two sparse PCA components scores of SCFA related host gene expression levels of 12 samples from two different feeding types")>>=
+#graphs:
+cca_SCFA_u<-cca_seed2%*%cca_SCFA$u
+cca_SCFA_v<-cca_SCFA_subjects%*%cca_SCFA$v
+cca_SCFA_scores<-cbind(cca_SCFA_u,cca_SCFA_v)
+colnames(cca_SCFA_scores)<-c("U1","U2","V1","V2")
+cca_SCFA_scores<-as.data.frame(cca_SCFA_scores)
+cca_SCFA_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca_SCFA_plot2<-ggplot(cca_SCFA_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca_SCFA_plot2<-cca_SCFA_plot2+geom_point(size=4)
+cca_SCFA_plot2<-cca_SCFA_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+cca_SCFA_plot2<-cca_SCFA_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca_SCFA_plot2<-cca_SCFA_plot2+geom_text(aes(label=rownames(cca_SCFA_scores)),
+                                         col="black",hjust=1.1,size=5)
+cca_SCFA_plot2<-cca_SCFA_plot2+scale_x_continuous("First Component Scores of SCFA",
+                                                  limits=c(4,12))
+cca_SCFA_plot2<-cca_SCFA_plot2+scale_y_continuous("Second Component Scores of SCFA")
+cca_SCFA_plot2<-cca_SCFA_plot2+labs(title="Sparse CCA Scores for SCFA as Base")
+cca_SCFA_plot2<-cca_SCFA_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+#setInternet2(T) ## to make https work
+#source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+cca_SCFA_plot2<-cca_SCFA_plot2+stat_ellipse(aes(fill=type),level=0.60,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca_SCFA_plot2<-cca_SCFA_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_SCFA_special1<-cca_SCFA_scores[rep(11,100),]
+# for(t in 1:100){
+#  cca_SCFA_special1[t,3:4]<-cca_SCFA_special1[t,3:4]+c(sin(t*2*pi/100)*0.5,cos(t*2*pi/100)*0.4)
+# }
+# cca_SCFA_plot2<-cca_SCFA_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_SCFA_special1,
+#                                     alpha=0.2,linetype=0)
+cca_SCFA_plot2
+
+# the other cca graph:
+cca_SCFA_plot1<-ggplot(cca_SCFA_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca_SCFA_plot1<-cca_SCFA_plot1+geom_point(size=4)
+cca_SCFA_plot1<-cca_SCFA_plot1+scale_colour_continuous(name="First Component\nScores of SCFA",
+                                                     low="blue",high="red")
+cca_SCFA_plot1<-cca_SCFA_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca_SCFA_plot1<-cca_SCFA_plot1+geom_text(aes(label=rownames(cca_SCFA_scores)),
+                                               col="black",hjust=1.1,size=4)
+cca_SCFA_plot1<-cca_SCFA_plot1+scale_x_continuous("First Component Scores of Seedlevel2")
+cca_SCFA_plot1<-cca_SCFA_plot1+scale_y_continuous("Second Component Scores of Seedlevel2")
+cca_SCFA_plot1<-cca_SCFA_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+cca_SCFA_plot1<-cca_SCFA_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca_SCFA_plot1<-cca_SCFA_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+cca_SCFA_special2<-cca_SCFA_scores[rep(c(1,10),each=100),]
+for(t in 1:(100*2)){
+ cca_SCFA_special2[t,1:2]<-cca_SCFA_special2[t,1:2]+c(sin(t*2*pi/100)*100,cos(t*2*pi/100)*50)
+}
+for(t in 1:2){
+  cca_SCFA_plot1<-cca_SCFA_plot1+geom_polygon(aes(x=U1,y=U2,fill=type),
+                                                    cca_SCFA_special2[seq(t*100-99,t*100,by=1),],
+                                                    alpha=0.2,linetype=0)
+}
+cca_SCFA_plot1<-cca_SCFA_plot1+scale_fill_discrete(name="Feeding Type",
+                                         labels=c("Breastfed","Formula-fed"))
+cca_SCFA_plot1
+
+# SCFA sparse PCA plot/ the spca plot for seedlevel2 has been given before
+# SCFA sparse PCA plot/ the spca plot for seedlevel2 has been given before
+# SCFA sparse PCA plot/ the spca plot for seedlevel2 has been given before
+spca_SCFA_cv<-SPC.cv(x=cca_SCFA_subjects,sumabsvs=seq(1,sqrt(22),by=0.1),
+                      nfolds=10,niter=50)
+spca_SCFA<-SPC(x=cca_SCFA_subjects,sumabsv=spca_SCFA_cv$bestsumabsv,
+                K=2)
+spca_SCFA_scores<-spca_SCFA$u
+rownames(spca_SCFA_scores)<-rownames(cca_SCFA_subjects)
+spca_SCFA_scores<-as.data.frame(spca_SCFA_scores)
+names(spca_SCFA_scores)<-c("Host1","Host2")
+spca_SCFA_scores$type<-c(rep("BF",6),rep("FF",6))
+library(ggplot2)
+spca_SCFA_plot1<-ggplot(spca_SCFA_scores,aes(x=Host1,y=Host2,shape=type,colour=type,
+                                   ymax=max(abs(Host2))*1.5))
+spca_SCFA_plot1<-spca_SCFA_plot1+geom_point(size=4)
+spca_SCFA_plot1<-spca_SCFA_plot1+scale_shape_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+spca_SCFA_plot1<-spca_SCFA_plot1+scale_color_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+spca_SCFA_plot1<-spca_SCFA_plot1+geom_text(aes(label=rownames(spca_SCFA_scores)),
+                                 col="black",hjust=1.1,size=4,
+                                 position=position_jitter(height=0.01,width=0.01))
+## the position=position_jitter(height=0.01,width=0.01) will make the material in the same group 
+# a litter bit separate.
+## wihle position_dodge will separate the material between groups.
+spca_SCFA_plot1<-spca_SCFA_plot1+scale_x_continuous("First PCA Scores of Hosts")
+spca_SCFA_plot1<-spca_SCFA_plot1+scale_y_continuous("Second PCA Scores of Hosts")
+spca_SCFA_plot1<-spca_SCFA_plot1+labs(title="Sparse PCA Scores from SCFA of Hosts")
+spca_SCFA_plot1<-spca_SCFA_plot1+theme(legend.title=element_text(size=10),
+                             legend.text=element_text(size=8),
+                             plot.title=element_text(size=14,vjust=1.1,face="bold"))
+#source("https://raw.github.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+spca_SCFA_plot1<-spca_SCFA_plot1+stat_ellipse(aes(x=Host1,y=Host2,fill=type),
+                                    level=0.8,geom="polygon",alpha=0.2)
+spca_SCFA_plot1<-spca_SCFA_plot1+scale_fill_discrete(name="Feeding Type",
+                                            labels=c("Breastfed","Formula-fed"))
+# add one special location:
+spca_SCFA_special<-spca_SCFA_scores[rep(6,100),]
+for(t in 1:100){
+ spca_SCFA_special[t,1:2]<-spca_SCFA_special[t,1:2]+c(sin(t*2*pi/100)/30,cos(t*2*pi/100)/30)
+}
+spca_SCFA_plot1<-spca_SCFA_plot1+geom_polygon(aes(x=Host1,y=Host2,fill=type),
+                                                    spca_SCFA_special,alpha=0.2)
+spca_SCFA_special2<-spca_SCFA_scores[rep(11,100),]
+for(t in 1:100){
+ spca_SCFA_special2[t,1:2]<-spca_SCFA_special2[t,1:2]+c(sin(t*2*pi/100)/30,cos(t*2*pi/100)/30)
+}
+spca_SCFA_plot1<-spca_SCFA_plot1+geom_polygon(aes(x=Host1,y=Host2,fill=type),
+                                                    spca_SCFA_special2,alpha=0.2)
+spca_SCFA_plot1
+@
+Also, we can summary the scores as follows: \\
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from SCFA & \Sexpr{mean(cca_SCFA_scores$V1[1:6])} & \Sexpr{sd(cca_SCFA_scores$V1[1:6])} & \Sexpr{mean(cca_SCFA_scores$V1[7:12])} & \Sexpr{sd(cca_SCFA_scores$V1[7:12])}\\
+\hline
+Second Component Scores from SCFA & \Sexpr{mean(cca_SCFA_scores$V2[1:6])} & \Sexpr{sd(cca_SCFA_scores$V2[1:6])} & \Sexpr{mean(cca_SCFA_scores$V2[7:12])} & \Sexpr{sd(cca_SCFA_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(cca_SCFA_scores$U1[1:6])} & \Sexpr{sd(cca_SCFA_scores$U1[1:6])} & \Sexpr{mean(cca_SCFA_scores$U1[7:12])} & \Sexpr{sd(cca_SCFA_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(cca_SCFA_scores$U2[1:6])} & \Sexpr{sd(cca_SCFA_scores$U2[1:6])} & \Sexpr{mean(cca_SCFA_scores$U2[7:12])} & \Sexpr{sd(cca_SCFA_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+
+<<t test for genes,eval=FALSE>>=
+library(xlsx)
+p_value_cal<-function(data=cca_microarray_subjects,
+                      cca_output=cca_out_both_2){
+n<-dim(data)[2]
+output<-sapply(1:n,function(x,data){
+  p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+  fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+  return(c(p_value,fold_change))
+},data=data)
+output<-as.data.frame(t(output),row.names=colnames(data))
+names(output)<-c("p_value","fold_change")
+output$adjust_p<-p.adjust(output$p_value,method="fdr")
+output$first_comp_loading<-cca_output$v[,1]
+output$second_comp_loading<-cca_output$v[,2]
+output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+output1<-output[which(output$first_comp_loading!=0),]
+output2<-output[which(output$first_comp_loading==0),]
+output2<-output2[order(abs(output2$second_comp_loading),decreasing=T),]
+output<-rbind(output1,output2)
+#return(output)
+return(output[c(4,5)])
+}
+## fold change & pvalues
+unique_valid_genes<-dim(samples_Loessed_average)[2]
+pvalue_for_all<-sapply(1:unique_valid_genes,function(x,data){
+  p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+  fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+  return(c(p_value,fold_change))
+},data=samples_Loessed_average)
+
+pvalue_for_all<-as.data.frame(t(pvalue_for_all),
+                              row.names=colnames(samples_Loessed_average))
+pvalue_for_all$adjust_p<-p.adjust(pvalue_for_all[,1],method="fdr")
+names(pvalue_for_all)<-c("Raw p values","Fold Change",
+                         "Adjusted p values")
+##for Immunology:
+pvalue_Immun_genes<-p_value_cal()
+#colnames(pvalue_Immun_genes)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_Immun_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_Immun_genes<-cbind(pvalue_Immun_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                                                  rownames(pvalue_Immun_genes)),])
+
+temp_NULL<-combo_immunology_list[! combo_immunology_list 
+                                 %in% colnames(cca_microarray_subjects)]
+pvalue_Immun_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_Immun_genes_NULL)<-temp_NULL
+# colnames(pvalue_Immun_genes_NULL)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_Immun_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Fold Change",
+                                      "Adjusted p values")
+
+pvalue_Immun_genes<-rbind(pvalue_Immun_genes,pvalue_Immun_genes_NULL)
+
+write.xlsx(pvalue_Immun_genes,file="total and select genes of Immunology.xlsx")
+
+##for Barrier
+pvalue_Barrier_genes<-p_value_cal(data=cca_Barrier_subjects,
+                                  cca_output=cca_Barrier)
+# colnames(pvalue_Barrier_genes)<-c("Raw p value", "Fold Change",
+#                                   "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_Barrier_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_Barrier_genes<-cbind(pvalue_Barrier_genes,
+                            pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                            rownames(pvalue_Barrier_genes)),])
+
+temp_NULL<-Barrier_list[! Barrier_list 
+                                 %in% colnames(cca_Barrier_subjects)]
+pvalue_Barrier_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_Barrier_genes_NULL)<-temp_NULL
+# colnames(pvalue_Barrier_genes_NULL)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_Barrier_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Fold Change",
+                                      "Adjusted p values")
+pvalue_Barrier_genes<-rbind(pvalue_Barrier_genes,pvalue_Barrier_genes_NULL)
+write.xlsx(pvalue_Barrier_genes,file="total and select genes of Barrier.xlsx")
+
+##for SCFA
+pvalue_SCFA_genes<-p_value_cal(data=cca_SCFA_subjects,
+                                  cca_output=cca_SCFA)
+# colnames(pvalue_SCFA_genes)<-c("Raw p value", "Fold Change",
+#                                   "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_SCFA_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_SCFA_genes<-cbind(pvalue_SCFA_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                                                  rownames(pvalue_SCFA_genes)),])
+
+temp_NULL<-SCFA_list[! SCFA_list 
+                                 %in% colnames(cca_SCFA_subjects)]
+pvalue_SCFA_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_SCFA_genes_NULL)<-temp_NULL
+# colnames(pvalue_SCFA_genes_NULL)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_SCFA_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Fold Change",
+                                      "Adjusted p values")
+pvalue_SCFA_genes<-rbind(pvalue_SCFA_genes,pvalue_SCFA_genes_NULL)
+write.xlsx(pvalue_SCFA_genes,file="total and select genes of SCFA.xlsx")
+
+
+##for SMD
+pvalue_SMD_genes<-p_value_cal(data=cca_SMD_subjects,
+                                  cca_output=cca_SMD)
+# colnames(pvalue_SMD_genes)<-c("Raw p value", "Fold Change",
+#                                   "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_SMD_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_SMD_genes<-cbind(pvalue_SMD_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                                                  rownames(pvalue_SMD_genes)),])
+
+temp_NULL<-SMD_list[! SMD_list 
+                                 %in% colnames(cca_SMD_subjects)]
+pvalue_SMD_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_SMD_genes_NULL)<-temp_NULL
+# colnames(pvalue_SMD_genes_NULL)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_SMD_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Fold Change",
+                                      "Adjusted p values")
+pvalue_SMD_genes<-rbind(pvalue_SMD_genes,pvalue_SMD_genes_NULL)
+write.xlsx(pvalue_SMD_genes,file="total and select genes of SMD.xlsx")
+
+
+## for seedlevel2:
+## for seedlevel2:
+## for seedlevel2:
+## for seedlevel2:
+# p_value_cal2<-function(data=cca_seed2,
+#                       cca_output=cca_out_both_2){
+# n<-dim(data)[2]
+# output<-sapply(1:n,function(x,data){
+#   p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+#   fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+#   return(c(p_value,fold_change))
+# },data=data)
+# output<-as.data.frame(t(output),row.names=colnames(data))
+# names(output)<-c("p_value","fold_change")
+# output$adjust_p<-p.adjust(output$p_value,method="fdr")
+# output$first_comp_loading<-cca_output$u[,1]
+# output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+# return(output)
+# }
+# 
+# # for seedlevel2 with Immunology
+# pvalue_seed2_Immun<-p_value_cal2()
+# write.xlsx(pvalue_seed2_Immun,
+#            file="pvalues and feature detection of Seedlevel2 with Immunology.xlsx")
+# 
+# #for seedlevel2 with Barrier
+# pvalue_seed2_Barrier<-p_value_cal2(cca_output=cca_Barrier)
+# write.xlsx(pvalue_seed2_Barrier,
+#            file="pvalues and feature detection of Seedlevel2 with Barrier.xlsx")
+@
+
+
+\section{Pairwise Sparse CCA with Metabolite}
+Now we have a new data set of our 12 samples: Metabolite data. After loading the data, we can analyze them pair by pair with sparse CCA. The pair of gene list and Seedlevel2 has been done previously. Thus we can have a look at the sparse CCA analysis between the genes and Metabolite as well as the pair of Seedlevel2 and Metabolite.
+<<Read Metabolite,results='markup'>>=
+library(xlsx)
+Metabolite<-read.xlsx("../SCFA_Metabolite_03_24_15.xlsx",sheetIndex=1,
+                      rowIndex=c(3,6:11,13:18),
+                      colIndex=c(12:14,16:18),header=T)
+rownames(Metabolite)<-c("BF3","BF4","BF6","BMS8","BMS10","BMS16",
+                        "FF2","FF3","FF5","FF7","FF13","FF15")
+Metabolite<-Metabolite[rownames(cca_Barrier_subjects),]
+Metabolite
+@
+
+
+\subsection{Immunology and Metabolite}
+
+<<cca2_Immun,results='hide'>>=
+cca2_Immun_permute<-CCA.permute(x=Metabolite,z=cca_microarray_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=100,nperm=100)
+cca2_Immun_penaltyx<-cca2_Immun_permute$bestpenaltyx
+cca2_Immun_penaltyz<-cca2_Immun_permute$bestpenaltyz
+cca2_Immun<-CCA(x=Metabolite,z=cca_microarray_subjects,
+                 typex="standard",typez="standard",
+                penaltyx=cca2_Immun_penaltyx,penaltyz=cca2_Immun_penaltyz,
+                 xnames=colnames(Metabolite),
+                 znames=colnames(cca_microarray_subjects),
+                 K=2,niter=100)
+# colnames(cca_microarray_subjects)[which(cca2_Immun$v[,1]!=0)]
+# colnames(cca_microarray_subjects)[which(cca2_Immun$v[,2]!=0)]
+
+#graphs:
+cca2_Immun_u<-as.matrix(Metabolite)%*%cca2_Immun$u
+cca2_Immun_v<-cca_microarray_subjects%*%cca2_Immun$v
+cca2_Immun_scores<-cbind(cca2_Immun_u,cca2_Immun_v)
+colnames(cca2_Immun_scores)<-c("U1","U2","V1","V2")
+cca2_Immun_scores<-as.data.frame(cca2_Immun_scores)
+cca2_Immun_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca2_Immun_plot2<-ggplot(cca2_Immun_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca2_Immun_plot2<-cca2_Immun_plot2+geom_point(size=4)
+cca2_Immun_plot2<-cca2_Immun_plot2+scale_colour_continuous(name="First Component\nScores of Metabolite",low="blue",high="red")
+cca2_Immun_plot2<-cca2_Immun_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_Immun_plot2<-cca2_Immun_plot2+geom_text(aes(label=rownames(cca2_Immun_scores)),col="black",
+                                             hjust=1.1,size=5)
+cca2_Immun_plot2<-cca2_Immun_plot2+scale_x_continuous("First Component Scores of Immunology")
+cca2_Immun_plot2<-cca2_Immun_plot2+scale_y_continuous("Second Component Scores of Immunology")
+cca2_Immun_plot2<-cca2_Immun_plot2+labs(title="Sparse CCA Scores for Immunology as Base")
+cca2_Immun_plot2<-cca2_Immun_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+#setInternet2(T) ## to make https work
+#source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+cca2_Immun_plot2<-cca2_Immun_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca2_Immun_plot2<-cca2_Immun_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+
+cca2_Immun_plot2
+
+# the other cca graph:
+cca2_Immun_plot1<-ggplot(cca2_Immun_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca2_Immun_plot1<-cca2_Immun_plot1+geom_point(size=4)
+                                            #    position=position_jitter(height=2,width=2))
+cca2_Immun_plot1<-cca2_Immun_plot1+scale_colour_continuous(name="First Component\nScores of Immunology",low="blue",high="red")
+cca2_Immun_plot1<-cca2_Immun_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_Immun_plot1<-cca2_Immun_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                              # position=position_jitter(height=2,width=2))
+cca2_Immun_plot1<-cca2_Immun_plot1+scale_x_continuous("First Component Scores of Metabolite")
+cca2_Immun_plot1<-cca2_Immun_plot1+scale_y_continuous("Second Component Scores of Metabolite")
+cca2_Immun_plot1<-cca2_Immun_plot1+labs(title="Sparse CCA Scores for Metabolite as Base")
+cca2_Immun_plot1<-cca2_Immun_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca2_Immun_plot1<-cca2_Immun_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+
+cca2_Immun_plot1<-cca2_Immun_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+cca2_Immun_plot1
+@
+The sparse CCA results in detecting $\Sexpr{length(which(cca2_Immun$v[,1]!=0))}$ genes in the first component, which are {\it \Sexpr{colnames(cca_microarray_subjects)[which(cca2_Immun$v[,1]!=0)]}}, and $\Sexpr{length(which(cca2_Immun$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_microarray_subjects)[which(cca2_Immun$v[,2]!=0)]}}.
+
+\subsection{Barrier genes and Metabolite}
+<<cca2_Barrier,results='hide'>>=
+cca2_Barrier_permute<-CCA.permute(x=Metabolite,z=cca_Barrier_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+cca2_Barrier_penaltyx<-cca2_Barrier_permute$bestpenaltyx
+cca2_Barrier_penaltyz<-cca2_Barrier_permute$bestpenaltyz
+cca2_Barrier<-CCA(x=Metabolite,z=cca_Barrier_subjects,
+                 typex="standard",typez="standard",
+                penaltyx=cca2_Barrier_penaltyx,penaltyz=cca2_Barrier_penaltyz,
+                 xnames=colnames(Metabolite),
+                 znames=colnames(cca_Barrier_subjects),
+                 K=2,niter=50)
+# colnames(cca_Barrier_subjects)[which(cca2_Barrier$v[,1]!=0)]
+# colnames(cca_Barrier_subjects)[which(cca2_Barrier$v[,2]!=0)]
+
+#graphs:
+cca2_Barrier_u<-as.matrix(Metabolite)%*%cca2_Barrier$u
+cca2_Barrier_v<-cca_Barrier_subjects%*%cca2_Barrier$v
+cca2_Barrier_scores<-cbind(cca2_Barrier_u,cca2_Barrier_v)
+colnames(cca2_Barrier_scores)<-c("U1","U2","V1","V2")
+cca2_Barrier_scores<-as.data.frame(cca2_Barrier_scores)
+cca2_Barrier_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca2_Barrier_plot2<-ggplot(cca2_Barrier_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca2_Barrier_plot2<-cca2_Barrier_plot2+geom_point(size=4)
+cca2_Barrier_plot2<-cca2_Barrier_plot2+scale_colour_continuous(name="First Component\nScores of Metabolite",low="blue",high="red")
+cca2_Barrier_plot2<-cca2_Barrier_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_Barrier_plot2<-cca2_Barrier_plot2+geom_text(aes(label=rownames(cca2_Barrier_scores)),
+                                                 col="black",
+                                             hjust=1.1,size=5)
+cca2_Barrier_plot2<-cca2_Barrier_plot2+scale_x_continuous("First Component Scores of Barrier")
+cca2_Barrier_plot2<-cca2_Barrier_plot2+scale_y_continuous("Second Component Scores of Barrier")
+cca2_Barrier_plot2<-cca2_Barrier_plot2+labs(title="Sparse CCA Scores for Barrier as Base")
+cca2_Barrier_plot2<-cca2_Barrier_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+# setInternet2(T) ## to make https work
+# source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+cca2_Barrier_plot2<-cca2_Barrier_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca2_Barrier_plot2<-cca2_Barrier_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_Barrier_special1<-cca_Barrier_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_Barrier_special1[t,3:4]<-cca_Barrier_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_Barrier_plot2<-cca_Barrier_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_Barrier_special1,
+#                                     alpha=0.2,linetype=0)
+cca2_Barrier_plot2
+
+# the other cca graph:
+cca2_Barrier_plot1<-ggplot(cca2_Barrier_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca2_Barrier_plot1<-cca2_Barrier_plot1+geom_point(size=4)
+                                            #    position=position_jitter(height=2,width=2))
+cca2_Barrier_plot1<-cca2_Barrier_plot1+scale_colour_continuous(name="First Component\nScores of Barrier",low="blue",high="red")
+cca2_Barrier_plot1<-cca2_Barrier_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_Barrier_plot1<-cca2_Barrier_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                              # position=position_jitter(height=2,width=2))
+cca2_Barrier_plot1<-cca2_Barrier_plot1+scale_x_continuous("First Component Scores of Metabolite")
+cca2_Barrier_plot1<-cca2_Barrier_plot1+scale_y_continuous("Second Component Scores of Metabolite")
+cca2_Barrier_plot1<-cca2_Barrier_plot1+labs(title="Sparse CCA Scores for Metabolite as Base")
+cca2_Barrier_plot1<-cca2_Barrier_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca2_Barrier_plot1<-cca2_Barrier_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+
+cca2_Barrier_plot1<-cca2_Barrier_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+cca2_Barrier_plot1
+@
+The sparse CCA results in detecting $\Sexpr{length(which(cca2_Barrier$v[,1]!=0))}$ genes in the first component, which are {\it \Sexpr{colnames(cca_Barrier_subjects)[which(cca2_Barrier$v[,1]!=0)]}}, and $\Sexpr{length(which(cca2_Barrier$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_Barrier_subjects)[which(cca2_Barrier$v[,2]!=0)]}}.
+
+\subsection{SCFA related genes and Metabolite}
+<<cca2_SCFA,results='hide'>>=
+cca2_SCFA_permute<-CCA.permute(x=Metabolite,z=cca_SCFA_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+cca2_SCFA_penaltyx<-cca2_SCFA_permute$bestpenaltyx
+cca2_SCFA_penaltyz<-cca2_SCFA_permute$bestpenaltyz
+cca2_SCFA<-CCA(x=Metabolite,z=cca_SCFA_subjects,
+                 typex="standard",typez="standard",
+                penaltyx=cca2_SCFA_penaltyx,penaltyz=cca2_SCFA_penaltyz,
+                 xnames=colnames(Metabolite),
+                 znames=colnames(cca_SCFA_subjects),
+                 K=2,niter=50)
+# colnames(cca_SCFA_subjects)[which(cca2_SCFA$v[,1]!=0)]
+# colnames(cca_SCFA_subjects)[which(cca2_SCFA$v[,2]!=0)]
+
+#graphs:
+cca2_SCFA_u<-as.matrix(Metabolite)%*%cca2_SCFA$u
+cca2_SCFA_v<-cca_SCFA_subjects%*%cca2_SCFA$v
+cca2_SCFA_scores<-cbind(cca2_SCFA_u,cca2_SCFA_v)
+colnames(cca2_SCFA_scores)<-c("U1","U2","V1","V2")
+cca2_SCFA_scores<-as.data.frame(cca2_SCFA_scores)
+cca2_SCFA_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca2_SCFA_plot2<-ggplot(cca2_SCFA_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca2_SCFA_plot2<-cca2_SCFA_plot2+geom_point(size=4)
+cca2_SCFA_plot2<-cca2_SCFA_plot2+scale_colour_continuous(name="First Component\nScores of Metabolite",low="blue",high="red")
+cca2_SCFA_plot2<-cca2_SCFA_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_SCFA_plot2<-cca2_SCFA_plot2+geom_text(aes(label=rownames(cca2_SCFA_scores)),
+                                                 col="black",
+                                             hjust=1.1,size=5)
+cca2_SCFA_plot2<-cca2_SCFA_plot2+scale_x_continuous("First Component Scores of SCFA")
+cca2_SCFA_plot2<-cca2_SCFA_plot2+scale_y_continuous("Second Component Scores of SCFA")
+cca2_SCFA_plot2<-cca2_SCFA_plot2+labs(title="Sparse CCA Scores for SCFA as Base")
+cca2_SCFA_plot2<-cca2_SCFA_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+# setInternet2(T) ## to make https work
+# source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+cca2_SCFA_plot2<-cca2_SCFA_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca2_SCFA_plot2<-cca2_SCFA_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_SCFA_special1<-cca_SCFA_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_SCFA_special1[t,3:4]<-cca_SCFA_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_SCFA_plot2<-cca_SCFA_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_SCFA_special1,
+#                                     alpha=0.2,linetype=0)
+cca2_SCFA_plot2
+
+# the other cca graph:
+cca2_SCFA_plot1<-ggplot(cca2_SCFA_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca2_SCFA_plot1<-cca2_SCFA_plot1+geom_point(size=4)
+                                            #    position=position_jitter(height=2,width=2))
+cca2_SCFA_plot1<-cca2_SCFA_plot1+scale_colour_continuous(name="First Component\nScores of SCFA",low="blue",high="red")
+cca2_SCFA_plot1<-cca2_SCFA_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_SCFA_plot1<-cca2_SCFA_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                              # position=position_jitter(height=2,width=2))
+cca2_SCFA_plot1<-cca2_SCFA_plot1+scale_x_continuous("First Component Scores of Metabolite")
+cca2_SCFA_plot1<-cca2_SCFA_plot1+scale_y_continuous("Second Component Scores of Metabolite")
+cca2_SCFA_plot1<-cca2_SCFA_plot1+labs(title="Sparse CCA Scores for Metabolite as Base")
+cca2_SCFA_plot1<-cca2_SCFA_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca2_SCFA_plot1<-cca2_SCFA_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+
+cca2_SCFA_plot1<-cca2_SCFA_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+cca2_SCFA_plot1
+@
+The sparse CCA results in detecting $\Sexpr{length(which(cca2_SCFA$v[,1]!=0))}$ genes in the first component, which are {\it \Sexpr{colnames(cca_SCFA_subjects)[which(cca2_SCFA$v[,1]!=0)]}}, and $\Sexpr{length(which(cca2_SCFA$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_SCFA_subjects)[which(cca2_SCFA$v[,2]!=0)]}}.
+
+\subsection{Metabolite and Seedlevel2}
+In this subsection we apply sparse CCA analysis on Metabolite dataset and Microbial dataset. Note that this one cannot output the featured genes, the output of featured Microbial may give us prior information and help improve the Sparse CCA result with this refined subset of Microbial. However, shall we only consider the first component of selected seedlevel2 or combine the first two components outputs? And how to interpret the results (logic flow)? 
+<<cca2_seedlevel2,results='hide'>>=
+cca2_seedlevel2_permute<-CCA.permute(x=Metabolite,z=cca_seed2,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+cca2_seedlevel2_penaltyx<-cca2_seedlevel2_permute$bestpenaltyx
+cca2_seedlevel2_penaltyz<-cca2_seedlevel2_permute$bestpenaltyz
+cca2_seedlevel2<-CCA(x=Metabolite,z=cca_seed2,
+                 typex="standard",typez="standard",
+                penaltyx=cca2_seedlevel2_penaltyx,penaltyz=cca2_seedlevel2_penaltyz,
+                 xnames=colnames(Metabolite),
+                 znames=colnames(cca_seed2),
+                 K=2,niter=50)
+# colnames(cca_seed2)[which(cca2_seedlevel2$v[,1]!=0)]
+# colnames(cca_seed2)[which(cca2_seedlevel2$v[,2]!=0)]
+
+#graphs:
+cca2_seedlevel2_u<-as.matrix(Metabolite)%*%cca2_seedlevel2$u
+cca2_seedlevel2_v<-cca_seed2%*%cca2_seedlevel2$v
+cca2_seedlevel2_scores<-cbind(cca2_seedlevel2_u,cca2_seedlevel2_v)
+colnames(cca2_seedlevel2_scores)<-c("U1","U2","V1","V2")
+cca2_seedlevel2_scores<-as.data.frame(cca2_seedlevel2_scores)
+cca2_seedlevel2_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+cca2_seedlevel2_plot2<-ggplot(cca2_seedlevel2_scores,aes(x=V1,y=V2,col=U1,shape=type))
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+geom_point(size=4)
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+scale_colour_continuous(name="First Component\nScores of Metabolite",low="blue",high="red")
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+geom_text(aes(label=rownames(cca2_seedlevel2_scores)),
+                                                 col="black",
+                                             hjust=1.1,size=5)
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+scale_x_continuous("First Component Scores of seedlevel2")
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+scale_y_continuous("Second Component Scores of seedlevel2")
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+labs(title="Sparse CCA Scores for seedlevel2 as Base")
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+# setInternet2(T) ## to make https work
+# source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+cca2_seedlevel2_plot2<-cca2_seedlevel2_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_seedlevel2_special1<-cca_seedlevel2_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_seedlevel2_special1[t,3:4]<-cca_seedlevel2_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_seedlevel2_plot2<-cca_seedlevel2_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_seedlevel2_special1,
+#                                     alpha=0.2,linetype=0)
+cca2_seedlevel2_plot2
+
+# the other cca graph:
+cca2_seedlevel2_plot1<-ggplot(cca2_seedlevel2_scores,aes(x=U1,y=U2,col=V1,shape=type))
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+geom_point(size=4)
+                                            #    position=position_jitter(height=2,width=2))
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+scale_colour_continuous(name="First Component\nScores of seedlevel2",low="blue",high="red")
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                              # position=position_jitter(height=2,width=2))
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+scale_x_continuous("First Component Scores of Metabolite")
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+scale_y_continuous("Second Component Scores of Metabolite")
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+labs(title="Sparse CCA Scores for Metabolite as Base")
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+
+cca2_seedlevel2_plot1<-cca2_seedlevel2_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+cca2_seedlevel2_plot1
+@
+
+The results of next section may be more interesting. 
+
+\section{Three directional CCA}
+Besides the pairwise analysis, we are more interested in putting three datasets together. The following analysis is based the objective function  $t^\ast = sum_{i<j} Cor(X_i^\ast w_i^\ast, X_j^\ast w_j\ast)+\mbox{Penalties},$ where $i,j \in \{1,2,3\}$.
+\subsection{For Immunology}
+<<ThreeDirectCCAImmun,results='hide'>>=
+## run multiCCA
+library(PMA)
+multi_Three_permute<-MultiCCA.permute(xlist=list(cca_seed2,cca_microarray_subjects,Metabolite),
+                                    type=rep("standard",3),niter=50,trace=F)
+multi_Three<-MultiCCA(xlist=list(cca_seed2,cca_microarray_subjects,Metabolite),
+                     penalty=multi_Three_permute$bestpenalties,
+                     type=rep("standard",3),niter=50,trace=F)
+
+##Graphs:
+
+multi_Immun_u<-cca_seed2%*%multi_Three$ws[[1]]
+multi_Immun_v<-cca_microarray_subjects%*%multi_Three$ws[[2]]
+multi_Immun_z<-as.matrix(Metabolite)%*%multi_Three$ws[[3]]
+multi_Immun_scores<-cbind(multi_Immun_u,multi_Immun_v,multi_Immun_z)
+colnames(multi_Immun_scores)<-c("U","V","Z")
+multi_Immun_scores<-as.data.frame(multi_Immun_scores)
+multi_Immun_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+multi_Immun_plot2<-ggplot(multi_Immun_scores,aes(x=V,y=Z,col=U,shape=type))
+multi_Immun_plot2<-multi_Immun_plot2+geom_point(size=4)
+multi_Immun_plot2<-multi_Immun_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+multi_Immun_plot2<-multi_Immun_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+multi_Immun_plot2<-multi_Immun_plot2+geom_text(aes(label=rownames(multi_Immun_scores)),col="black",hjust=1.1,size=5)
+multi_Immun_plot2<-multi_Immun_plot2+scale_x_continuous("First Component Scores of Immunology",
+                          limits=c(min(multi_Immun_scores$V)-diff(range(multi_Immun_scores$V))*0.3,
+                                  max(multi_Immun_scores$V)+diff(range(multi_Immun_scores$V))*0.3))
+multi_Immun_plot2<-multi_Immun_plot2+scale_y_continuous("First Component Scores of Metabolite")
+multi_Immun_plot2<-multi_Immun_plot2+labs(title="Three Directional Analysis: Metabolite VS Immunlogy")
+multi_Immun_plot2<-multi_Immun_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+#setInternet2(T) ## to make https work
+#source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+multi_Immun_plot2<-multi_Immun_plot2+stat_ellipse(aes(fill=type),level=0.80,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+multi_Immun_plot2<-multi_Immun_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_Barrier_special1<-cca_Barrier_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_Barrier_special1[t,3:4]<-cca_Barrier_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_Barrier_plot2<-cca_Barrier_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_Barrier_special1,
+#                                     alpha=0.2,linetype=0)
+multi_Immun_plot2
+
+# the other cca graph:
+multi_Immun_plot1<-ggplot(multi_Immun_scores,aes(x=V,y=U,col=Z,shape=type))
+multi_Immun_plot1<-multi_Immun_plot1+geom_point(size=4)
+                                              #  position=position_jitter(height=20,width=20))
+multi_Immun_plot1<-multi_Immun_plot1+scale_colour_continuous(name="First Component\nScores of Metabolite",low="blue",high="red")
+multi_Immun_plot1<-multi_Immun_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+multi_Immun_plot1<-multi_Immun_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                          #     position=position_jitter(height=20,width=20))
+multi_Immun_plot1<-multi_Immun_plot1+scale_x_continuous("First Component Scores of Immunology",
+                         limits=c(min(multi_Immun_scores$V)-diff(range(multi_Immun_scores$V))*0.3,
+                                  max(multi_Immun_scores$V)+diff(range(multi_Immun_scores$V))*0.3))
+multi_Immun_plot1<-multi_Immun_plot1+scale_y_continuous("First Component Scores of Seedlevel2")
+multi_Immun_plot1<-multi_Immun_plot1+labs(title="Three Directional Analysis: Seedlevel2 VS Immunology")
+multi_Immun_plot1<-multi_Immun_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+multi_Immun_plot1<-multi_Immun_plot1+stat_ellipse(aes(fill=type),level=0.8,alpha=0.2,
+                                  geom="polygon",linetype=2)
+multi_Immun_plot1<-multi_Immun_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+multi_Immun_plot1
+@
+
+The graphs look good. We apply this method to other gene lists.
+\subsection{Multivariate Sparse CCA to analyze Barrier genes}
+<<ThreeDirectCCABarrier,results='hide'>>=
+set.seed(12121)
+multi_Barrier_permute<-MultiCCA.permute(xlist=list(cca_seed2,cca_Barrier_subjects,Metabolite),
+                                    type=rep("standard",3),niter=50,trace=F)
+multi_Barrier<-MultiCCA(xlist=list(cca_seed2,cca_Barrier_subjects,Metabolite),
+                     penalty=multi_Barrier_permute$bestpenalties,
+                     type=rep("standard",3),niter=50,trace=F)
+# colnames(cca_Barrier_subjects)[which(multi_Barrier$ws[[2]]!=0)]
+
+## Graphs
+multi_Barrier_u<-cca_seed2%*%multi_Barrier$ws[[1]]
+multi_Barrier_v<-cca_Barrier_subjects%*%multi_Barrier$ws[[2]]
+multi_Barrier_z<-as.matrix(Metabolite)%*%multi_Barrier$ws[[3]]
+multi_Barrier_scores<-cbind(multi_Barrier_u,multi_Barrier_v,multi_Barrier_z)
+colnames(multi_Barrier_scores)<-c("U","V","Z")
+multi_Barrier_scores<-as.data.frame(multi_Barrier_scores)
+multi_Barrier_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+multi_Barrier_plot2<-ggplot(multi_Barrier_scores,aes(x=V,y=Z,col=U,shape=type))
+multi_Barrier_plot2<-multi_Barrier_plot2+geom_point(size=4)
+multi_Barrier_plot2<-multi_Barrier_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+multi_Barrier_plot2<-multi_Barrier_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+multi_Barrier_plot2<-multi_Barrier_plot2+geom_text(aes(label=rownames(multi_Barrier_scores)),
+                                                   col="black",hjust=1.1,size=5)
+multi_Barrier_plot2<-multi_Barrier_plot2+scale_x_continuous("First Component Scores of Barrier",
+                        limits=c(min(multi_Barrier_scores$V)-diff(range(multi_Barrier_scores$V))*0.3,
+                                max(multi_Barrier_scores$V)+diff(range(multi_Barrier_scores$V))*0.3))
+multi_Barrier_plot2<-multi_Barrier_plot2+scale_y_continuous("First Component Scores of Metabolite")
+multi_Barrier_plot2<-multi_Barrier_plot2+labs(title="Three Directional Analysis: Metabolite VS Barrier")
+multi_Barrier_plot2<-multi_Barrier_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+#setInternet2(T) ## to make https work
+#source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+multi_Barrier_plot2<-multi_Barrier_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+multi_Barrier_plot2<-multi_Barrier_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_Barrier_special1<-cca_Barrier_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_Barrier_special1[t,3:4]<-cca_Barrier_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_Barrier_plot2<-cca_Barrier_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_Barrier_special1,
+#                                     alpha=0.2,linetype=0)
+multi_Barrier_plot2
+
+# the other cca graph:
+multi_Barrier_plot1<-ggplot(multi_Barrier_scores,aes(x=V,y=U,col=Z,shape=type))
+multi_Barrier_plot1<-multi_Barrier_plot1+geom_point(size=4)
+                                              #  position=position_jitter(height=20,width=20))
+multi_Barrier_plot1<-multi_Barrier_plot1+scale_colour_continuous(name="First Component\nScores of Metabolite",low="blue",high="red")
+multi_Barrier_plot1<-multi_Barrier_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+multi_Barrier_plot1<-multi_Barrier_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                             #  position=position_jitter(height=20,width=20))
+multi_Barrier_plot1<-multi_Barrier_plot1+scale_x_continuous("First Component Scores of Barrier",
+                        limits=c(min(multi_Barrier_scores$V)-diff(range(multi_Barrier_scores$V))*0.3,
+                                max(multi_Barrier_scores$V)+diff(range(multi_Barrier_scores$V))*0.3))
+multi_Barrier_plot1<-multi_Barrier_plot1+scale_y_continuous("First Component Scores of Seedlevel2")
+multi_Barrier_plot1<-multi_Barrier_plot1+labs(title="Three Directional Analysis: Seedlevel2 VS Barrier")
+multi_Barrier_plot1<-multi_Barrier_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+multi_Barrier_plot1<-multi_Barrier_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+multi_Barrier_plot1<-multi_Barrier_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+multi_Barrier_plot1
+@
+The associated gene list we can get from this method is {\it \Sexpr{colnames(cca_Barrier_subjects)[which(multi_Barrier$ws[[2]]!=0)]}.} 
+
+\subsection{Multivariate sparse CCA to analyze SCFA related genes}
+<<ThreeDirectSCFA,results='hide'>>=
+set.seed(11)
+multi_SCFA_permute<-MultiCCA.permute(xlist=list(cca_seed2,cca_SCFA_subjects,Metabolite),
+                                    type=rep("standard",3),niter=50,trace=F)
+multi_SCFA<-MultiCCA(xlist=list(cca_seed2,cca_SCFA_subjects,Metabolite),
+                     penalty=multi_SCFA_permute$bestpenalties,
+                     type=rep("standard",3),niter=50,trace=F)
+# colnames(cca_SCFA_subjects)[which(multi_SCFA$ws[[2]]!=0)]
+
+## Graphs
+multi_SCFA_u<-cca_seed2%*%multi_SCFA$ws[[1]]
+multi_SCFA_v<-cca_SCFA_subjects%*%multi_SCFA$ws[[2]]
+multi_SCFA_z<-as.matrix(Metabolite)%*%multi_SCFA$ws[[3]]
+multi_SCFA_scores<-cbind(multi_SCFA_u,multi_SCFA_v,multi_SCFA_z)
+colnames(multi_SCFA_scores)<-c("U","V","Z")
+multi_SCFA_scores<-as.data.frame(multi_SCFA_scores)
+multi_SCFA_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+multi_SCFA_plot2<-ggplot(multi_SCFA_scores,aes(x=V,y=Z,col=U,shape=type))
+multi_SCFA_plot2<-multi_SCFA_plot2+geom_point(size=4)
+multi_SCFA_plot2<-multi_SCFA_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+multi_SCFA_plot2<-multi_SCFA_plot2+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+multi_SCFA_plot2<-multi_SCFA_plot2+geom_text(aes(label=rownames(multi_SCFA_scores)),
+                                                   col="black",hjust=1.1,size=5)
+multi_SCFA_plot2<-multi_SCFA_plot2+scale_x_continuous("First Component Scores of SCFA",
+                        limits=c(min(multi_SCFA_scores$V)-diff(range(multi_SCFA_scores$V))*0.3,
+                                max(multi_SCFA_scores$V)+diff(range(multi_SCFA_scores$V))*0.3))
+multi_SCFA_plot2<-multi_SCFA_plot2+scale_y_continuous("First Component Scores of Metabolite")
+multi_SCFA_plot2<-multi_SCFA_plot2+labs(title="Three Directional Analysis: Metabolite VS SCFA")
+multi_SCFA_plot2<-multi_SCFA_plot2+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+# setInternet2(T) ## to make https work
+# source("https://raw.githubusercontent.com/low-decarie/FAAV/master/r/stat-ellipse.R")
+source("../stat-ellipse.R")
+multi_SCFA_plot2<-multi_SCFA_plot2+stat_ellipse(aes(fill=type),level=0.85,alpha=0.2,
+                                  geom="polygon",linetype=2)
+#level for the scale of elli, alpha for the darkness of col,"polygon" for the cover of elli.
+#linetype=2 make the boundary transparent.
+multi_SCFA_plot2<-multi_SCFA_plot2+scale_fill_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+# cca_Barrier_special1<-cca_Barrier_scores[rep(5,100),]
+# for(t in 1:100){
+#  cca_Barrier_special1[t,3:4]<-cca_Barrier_special1[t,3:4]+c(sin(t*2*pi/100),cos(t*2*pi/100)*0.2)
+# }
+# cca_Barrier_plot2<-cca_Barrier_plot2+geom_polygon(aes(x=V1,y=V2,fill=type),cca_Barrier_special1,
+#                                     alpha=0.2,linetype=0)
+multi_SCFA_plot2
+
+# the other cca graph:
+multi_SCFA_plot1<-ggplot(multi_SCFA_scores,aes(x=V,y=U,col=Z,shape=type))
+multi_SCFA_plot1<-multi_SCFA_plot1+geom_point(size=4)
+                                              #  position=position_jitter(height=20,width=20))
+multi_SCFA_plot1<-multi_SCFA_plot1+scale_colour_continuous(name="First Component\nScores of Metabolite",
+                                                           low="blue",high="red")
+multi_SCFA_plot1<-multi_SCFA_plot1+scale_shape_discrete(name="Feeding Type",
+                                      labels=c("Breastfed","Formula-fed"))
+multi_SCFA_plot1<-multi_SCFA_plot1+geom_text(aes(label=rownames(cca_scores_2)),
+                                               col="black",hjust=1.1,size=4)
+                                            #   position=position_jitter(height=20,width=20))
+multi_SCFA_plot1<-multi_SCFA_plot1+scale_x_continuous("First Component Scores of SCFA",
+                          limits=c(min(multi_SCFA_scores$V)-diff(range(multi_SCFA_scores$V))*0.3,
+                                   max(multi_SCFA_scores$V)+diff(range(multi_SCFA_scores$V))*0.3))
+multi_SCFA_plot1<-multi_SCFA_plot1+scale_y_continuous("First Component Scores of Metabolite")
+multi_SCFA_plot1<-multi_SCFA_plot1+labs(title="Three Directional Analysis: Metabolite VS SCFA")
+multi_SCFA_plot1<-multi_SCFA_plot1+theme(legend.title = element_text(size=12),
+                       plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+multi_SCFA_plot1<-multi_SCFA_plot1+stat_ellipse(aes(fill=type),level=0.7,alpha=0.2,
+                                  geom="polygon",linetype=2)
+multi_SCFA_plot1<-multi_SCFA_plot1+scale_fill_discrete(name="Feeding Type",
+                                          labels=c("Breastfed","Formula-fed"))
+multi_SCFA_plot1
+@
+The gene list chosen by this method is {\it \Sexpr{colnames(cca_SCFA_subjects)[which(multi_SCFA$ws[[2]]!=0)]}.}
+\par
+It is shown above that the three directional sparse CCA works pretty good. 
+
+\subsection{Selected Gene Lists}
+In order to see the difference between the selected gene lists, we need to print out what they have in common.
+For Immunology, {\it \Sexpr{colnames(cca_microarray_subjects)[(multi_Three$ws[[2]]!=0) & (cca_out_both_2$v[,1]!=0 | cca_out_both_2$v[,2]!=0)]}} are selected in both methods. It means there are \Sexpr{length(colnames(cca_microarray_subjects)[(multi_Three$ws[[2]]!=0) & (cca_out_both_2$v[,1]!=0 | cca_out_both_2$v[,2]!=0)])} in both methods, while there are \Sexpr{length(colnames(cca_microarray_subjects)[(multi_Three$ws[[2]]!=0)])} genes selected from the three directional sparse cca and \Sexpr{length(colnames(cca_microarray_subjects)[(cca_out_both_2$v[,1]!=0 | cca_out_both_2$v[,2]!=0)])} for regular sparse cca. \\ $ $ \\
+
+For Barrier, {\it \Sexpr{colnames(cca_Barrier_subjects)[(multi_Barrier$ws[[2]]!=0) & (cca_Barrier$v[,1]!=0 | cca_Barrier$v[,2]!=0)]}} are selected in both methods, while there are \Sexpr{length(colnames(cca_Barrier_subjects)[which(multi_Barrier$ws[[2]]!=0)])} genes selected from the three directional cca and \Sexpr{colnames(cca_Barrier_subjects)[(cca_Barrier$v[,1]!=0 | cca_Barrier$v[,2]!=0)]} (\Sexpr{length(colnames(cca_Barrier_subjects)[(cca_Barrier$v[,1]!=0 | cca_Barrier$v[,2]!=0)])}) for regular sparse cca. \\ $ $ \\
+
+For SCFA, {\it \Sexpr{colnames(cca_SCFA_subjects)[(multi_SCFA$ws[[2]]!=0) & (cca_SCFA$v[,1]!=0 | cca_SCFA$v[,2]!=0)]}} are in both methods, while there are \Sexpr{length(colnames(cca_SCFA_subjects)[which(multi_SCFA$ws[[2]]!=0)])} genes selected from the three directional sparse cca and \Sexpr{colnames(cca_SCFA_subjects)[(cca_SCFA$v[,1]!=0 | cca_SCFA$v[,2]!=0)]} (\Sexpr{length(colnames(cca_SCFA_subjects)[(cca_SCFA$v[,1]!=0 | cca_SCFA$v[,2]!=0)])}) for regular sparse cca.
+\subsection{More Graphs}
+The 2 dimensional graphs for 3 directional sparse cca is actually the projection of 3 dimensional scatter plot. Thus if we can plot the graphs of on 3 dimensional space, we can have a better understanding of the difference between breastfed and formula-fed. 
+<<3d plots,rgl=TRUE,dev='png', out.width='9in', fig.align='center', fig.show='hold', warning=FALSE>>=
+# install.packages("rgl")
+library(rgl)
+plot3d(x=multi_Immun_scores$V,y=multi_Immun_scores$Z,z=multi_Immun_scores$U,
+       col=c("red","blue")[as.factor(multi_Immun_scores$type)],
+       xlab="Immunology",ylab="Seedlevel2",zlab="Metabolite",
+       main="Immunology together with Seedlevel2 and Metabolite",
+       size=2,xlim=c(min(multi_Immun_scores$V)-diff(range(multi_Immun_scores$V))*0.3,
+                     max(multi_Immun_scores$V)+diff(range(multi_Immun_scores$V))*0.3),
+        ylim=c(min(multi_Immun_scores$Z)-diff(range(multi_Immun_scores$Z))*0.3,
+                     max(multi_Immun_scores$Z)+diff(range(multi_Immun_scores$Z))*0.3),
+        zlim=c(min(multi_Immun_scores$U)-diff(range(multi_Immun_scores$U))*0.3,
+                     max(multi_Immun_scores$U)+diff(range(multi_Immun_scores$U))*0.3))
+text3d(x=(min(multi_Immun_scores$V)-diff(range(multi_Immun_scores$V))*0.3),
+       y=max(multi_Immun_scores$Z),z=max(multi_Immun_scores$U),
+       text="red: Breastfed blue: formula-fed")
+@
+
+<<Barrier 3d plot,rgl=TRUE,dev='png', out.width='9in', fig.align='center',fig.show='asis', warning=FALSE>>=
+##Barrier:
+# open3d()
+plot3d(x=multi_Barrier_scores$V,y=multi_Barrier_scores$Z,z=multi_Barrier_scores$U,
+       col=c("red","blue")[as.factor(multi_Barrier_scores$type)],
+       xlab="Barrier",ylab="Seedlevel2",zlab="Metabolite",
+       main="Barrier together with Seedlevel2 and Metabolite",
+       size=2,xlim=c(min(multi_Barrier_scores$V)-diff(range(multi_Barrier_scores$V))*0.3,
+                     max(multi_Barrier_scores$V)+diff(range(multi_Barrier_scores$V))*0.3),
+        ylim=c(min(multi_Barrier_scores$Z)-diff(range(multi_Barrier_scores$Z))*0.3,
+                     max(multi_Barrier_scores$Z)+diff(range(multi_Barrier_scores$Z))*0.3),
+        zlim=c(min(multi_Barrier_scores$U)-diff(range(multi_Barrier_scores$U))*0.3,
+                     max(multi_Barrier_scores$U)+diff(range(multi_Barrier_scores$U))*0.3))
+text3d(x=(min(multi_Barrier_scores$V)-diff(range(multi_Barrier_scores$V))*0.3),
+       y=max(multi_Barrier_scores$Z),z=max(multi_Barrier_scores$U),
+       text="red: Breastfed blue: formula-fed")
+@
+
+<<SCFA 3d plot,rgl=TRUE,dev='png', out.width='9in', fig.align='center', fig.show='asis', warning=FALSE>>=
+##SCFA
+plot3d(x=multi_SCFA_scores$V,y=multi_SCFA_scores$Z,z=multi_SCFA_scores$U,
+       col=c("red","blue")[as.factor(multi_SCFA_scores$type)],
+       xlab="SCFA",ylab="Seedlevel2",zlab="Metabolite",
+       main="SCFA together with Seedlevel2 and Metabolite",
+       size=2,xlim=c(min(multi_SCFA_scores$V)-diff(range(multi_SCFA_scores$V))*0.3,
+                     max(multi_SCFA_scores$V)+diff(range(multi_SCFA_scores$V))*0.3),
+        ylim=c(min(multi_SCFA_scores$Z)-diff(range(multi_SCFA_scores$Z))*0.3,
+                     max(multi_SCFA_scores$Z)+diff(range(multi_SCFA_scores$Z))*0.3),
+        zlim=c(min(multi_SCFA_scores$U)-diff(range(multi_SCFA_scores$U))*0.3,
+                     max(multi_SCFA_scores$U)+diff(range(multi_SCFA_scores$U))*0.3))
+text3d(x=(min(multi_SCFA_scores$V)-diff(range(multi_SCFA_scores$V))*0.3),
+       y=max(multi_SCFA_scores$Z),z=max(multi_SCFA_scores$U),
+       text="red: Breastfed blue: formula-fed")
+@
+
+%' \subsection{The outputs of gene components}
+%' The Immunology with three directional CCA results in the following gene component.
+%' <<genes componet of Immunology,results='hide'>>=
+%' names(multi_Three$ws[[2]])<-colnames(cca_microarray_subjects)
+%' multi_Three$ws[[2]][multi_Three$ws[[2]]!=0]
+%' @
+%' The Barrier list with three directional CCA results in the following gene component.
+%' <<gene component of Barrier,results='hide'>>=
+%' names(multi_Barrier$ws[[2]])<-colnames(cca_Barrier_subjects)
+%' multi_Barrier$ws[[2]][multi_Barrier$ws[[2]]!=0]
+%' @
+%' The SCFA list with three directional CCA results in the following gene component.
+%' <<gene component of SCFA,results='hide'>>=
+%' names(multi_SCFA$ws[[2]])<-colnames(cca_SCFA_subjects)
+%' multi_SCFA$ws[[2]][multi_SCFA$ws[[2]]!=0]
+%' @
+
+%' \section{To do normalization and t test}
+%' We apply the quantile normalization on the microarry data, then make a regular t test and also have a look at the fold change (ratio of BF over FF). The results, together with the sparse cca components loadings, will be exported to Excel files.
+%' 
+%' <<installing Bio,results='hide'>>=
+%' # if(!("affy") %in% installed.packages() | !("affydata") %in% installed.packages()){
+%' #   source("http://bioconductor.org/biocLite.R")
+%' #   biocLite(c("affy","affydata"))
+%' #   biocLite("preprocessCore")
+%' # }
+%' 
+%' library(affy)
+%' library(preprocessCore)
+%' set.seed(20150305)
+%' # samples_Loessed_redo<-normalize.loess(mat=t(samples_Loessed_average),
+%' #                                       log.it=F,maxit=5)
+%' 
+%'  samples_Loessed_redo<-normalize.qspline(x=exp(t(samples_Loessed_average)),
+%'                                          fit.iters=25,min.offset=3)
+%'  rownames(samples_Loessed_redo)<-colnames(samples_Loessed_average)
+%'  colnames(samples_Loessed_redo)<-rownames(samples_Loessed_average)
+%' #  mva.pairs(samples_Loessed_redo[,1:4],log.it=F)
+%' #  mva.pairs(samples_Loessed_redo[,5:8],log.it=F)
+%' #  mva.pairs(samples_Loessed_redo[,9:12],log.it=F)
+%'  mva_plot_obj<-apply(samples_Loessed_redo[,1:6],1,mean)
+%'  mva_plot_obj<-cbind(mva_plot_obj,apply(samples_Loessed_redo[,7:12],1,mean))
+%'  colnames(mva_plot_obj)<-c("BF","FF")
+%'  mva.pairs(mva_plot_obj)
+%'  samples_Loessed_redo<-t(samples_Loessed_redo)
+%' # samples_Loessed_redo[1:12,1:5]
+%' # stack_Loessed_redo<-stack(as.data.frame(t(samples_Loessed_redo)))
+%' # stack_Loessed_boxplot<-ggplot(stack_Loessed_redo,aes(x=ind,y=values))+geom_boxplot()
+%' @
+%' 
+%' <<t test for genes again,eval=FALSE>>=
+%' ## this part has been moved to the last section of this report 
+%' 
+%' library(xlsx)
+%' p_value_cal<-function(data=cca_microarray_subjects,
+%'                       cca_output=cca_out_both_2){
+%' n<-dim(data)[2]
+%' output<-sapply(1:n,function(x,data){
+%'   p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+%'   fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+%'   return(c(p_value,fold_change))
+%' },data=data)
+%' output<-as.data.frame(t(output),row.names=colnames(data))
+%' names(output)<-c("p_value","fold_change")
+%' output$adjust_p<-p.adjust(output$p_value,method="fdr")
+%' output$first_comp_loading<-cca_output$v[,1]
+%' output$second_comp_loading<-cca_output$v[,2]
+%' output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+%' output1<-output[which(output$first_comp_loading!=0),]
+%' output2<-output[which(output$first_comp_loading==0),]
+%' output2<-output2[order(abs(output2$second_comp_loading),decreasing=T),]
+%' output<-rbind(output1,output2)
+%' #return(output)
+%' return(output[c(4,5)])
+%' }
+%' ## fold change & pvalues
+%' unique_valid_genes_2<-dim(samples_Loessed_redo)[2]
+%' pvalue_for_all<-sapply(1:unique_valid_genes_2,function(x,data){
+%'   p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+%'   fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+%'   return(c(p_value,fold_change))
+%' },data=samples_Loessed_redo)
+%' 
+%' pvalue_for_all<-as.data.frame(t(pvalue_for_all),
+%'                               row.names=colnames(samples_Loessed_redo))
+%' pvalue_for_all$adjust_p<-p.adjust(pvalue_for_all[,1],method="fdr")
+%' names(pvalue_for_all)<-c("Raw p values","Fold Change",
+%'                          "Adjusted p values")
+%' ##for Immunology:
+%' pvalue_Immun_genes<-p_value_cal()
+%' #colnames(pvalue_Immun_genes)<-c("Raw p value", "Fold Change",
+%' #                                  "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_Immun_genes)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA")
+%' pvalue_Immun_genes<-cbind(pvalue_Immun_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+%'                                                                   rownames(pvalue_Immun_genes)),])
+%' 
+%' temp_NULL<-combo_immunology_list[! combo_immunology_list 
+%'                                  %in% colnames(cca_microarray_subjects)]
+%' pvalue_Immun_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                     rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)))
+%' rownames(pvalue_Immun_genes_NULL)<-temp_NULL
+%' # colnames(pvalue_Immun_genes_NULL)<-c("Raw p value", "Fold Change",
+%' #                                  "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_Immun_genes_NULL)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA",
+%'                                      "Raw p values","Fold Change",
+%'                                       "Adjusted p values")
+%' 
+%' pvalue_Immun_genes<-rbind(pvalue_Immun_genes,pvalue_Immun_genes_NULL)
+%' 
+%' write.xlsx(pvalue_Immun_genes,file="Immunology sparse CCA loadings with t test results.xlsx")
+%' 
+%' ##for Barrier
+%' pvalue_Barrier_genes<-p_value_cal(data=cca_Barrier_subjects,
+%'                                   cca_output=cca_Barrier)
+%' # colnames(pvalue_Barrier_genes)<-c("Raw p value", "Fold Change",
+%' #                                   "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_Barrier_genes)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA")
+%' pvalue_Barrier_genes<-cbind(pvalue_Barrier_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+%'                                                                   rownames(pvalue_Barrier_genes)),])
+%' 
+%' temp_NULL<-Barrier_list[! Barrier_list 
+%'                                  %in% colnames(cca_Barrier_subjects)]
+%' pvalue_Barrier_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                     rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)))
+%' rownames(pvalue_Barrier_genes_NULL)<-temp_NULL
+%' # colnames(pvalue_Barrier_genes_NULL)<-c("Raw p value", "Fold Change",
+%' #                                  "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_Barrier_genes_NULL)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA",
+%'                                      "Raw p values","Fold Change",
+%'                                       "Adjusted p values")
+%' pvalue_Barrier_genes<-rbind(pvalue_Barrier_genes,pvalue_Barrier_genes_NULL)
+%' write.xlsx(pvalue_Barrier_genes,file="Barrier genes sparse CCA loadings with t test results.xlsx")
+%' 
+%' ##for SCFA
+%' pvalue_SCFA_genes<-p_value_cal(data=cca_SCFA_subjects,
+%'                                   cca_output=cca_SCFA)
+%' # colnames(pvalue_SCFA_genes)<-c("Raw p value", "Fold Change",
+%' #                                   "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_SCFA_genes)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA")
+%' pvalue_SCFA_genes<-cbind(pvalue_SCFA_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+%'                                                                   rownames(pvalue_SCFA_genes)),])
+%' 
+%' temp_NULL<-SCFA_list[! SCFA_list 
+%'                                  %in% colnames(cca_SCFA_subjects)]
+%' pvalue_SCFA_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                     rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)))
+%' rownames(pvalue_SCFA_genes_NULL)<-temp_NULL
+%' # colnames(pvalue_SCFA_genes_NULL)<-c("Raw p value", "Fold Change",
+%' #                                  "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_SCFA_genes_NULL)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA",
+%'                                      "Raw p values","Fold Change",
+%'                                       "Adjusted p values")
+%' pvalue_SCFA_genes<-rbind(pvalue_SCFA_genes,pvalue_SCFA_genes_NULL)
+%' write.xlsx(pvalue_SCFA_genes,file="SCFA related genes sparse CCA loadings with t test results.xlsx")
+%' 
+%' 
+%' ##for SMD
+%' pvalue_SMD_genes<-p_value_cal(data=cca_SMD_subjects,
+%'                                   cca_output=cca_SMD)
+%' # colnames(pvalue_SMD_genes)<-c("Raw p value", "Fold Change",
+%' #                                   "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_SMD_genes)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA")
+%' pvalue_SMD_genes<-cbind(pvalue_SMD_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+%'                                                                   rownames(pvalue_SMD_genes)),])
+%' 
+%' temp_NULL<-SMD_list[! SMD_list 
+%'                                  %in% colnames(cca_SMD_subjects)]
+%' pvalue_SMD_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)),
+%'                                     rep(NA,length(temp_NULL)),
+%'                                      rep(NA,length(temp_NULL)))
+%' rownames(pvalue_SMD_genes_NULL)<-temp_NULL
+%' # colnames(pvalue_SMD_genes_NULL)<-c("Raw p value", "Fold Change",
+%' #                                  "Adjusted p value","First Comp. Loading of sCCA")
+%' colnames(pvalue_SMD_genes_NULL)<-c("First Comp. Loading of sCCA",
+%'                                      "Second Comp. Loading of sCCA",
+%'                                      "Raw p values","Fold Change",
+%'                                       "Adjusted p values")
+%' pvalue_SMD_genes<-rbind(pvalue_SMD_genes,pvalue_SMD_genes_NULL)
+%' write.xlsx(pvalue_SMD_genes,file="SMD genes sparse CCA loadings with t test results.xlsx")
+%' 
+%' 
+%' ## for seedlevel2:
+%' ## for seedlevel2:
+%' ## for seedlevel2:
+%' ## for seedlevel2:
+%' # p_value_cal2<-function(data=cca_seed2,
+%' #                       cca_output=cca_out_both_2){
+%' # n<-dim(data)[2]
+%' # output<-sapply(1:n,function(x,data){
+%' #   p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+%' #   fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+%' #   return(c(p_value,fold_change))
+%' # },data=data)
+%' # output<-as.data.frame(t(output),row.names=colnames(data))
+%' # names(output)<-c("p_value","fold_change")
+%' # output$adjust_p<-p.adjust(output$p_value,method="fdr")
+%' # output$first_comp_loading<-cca_output$u[,1]
+%' # output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+%' # return(output)
+%' # }
+%' # 
+%' # # for seedlevel2 with Immunology
+%' # pvalue_seed2_Immun<-p_value_cal2()
+%' # write.xlsx(pvalue_seed2_Immun,
+%' #            file="pvalues and feature detection of Seedlevel2 with Immunology.xlsx")
+%' # 
+%' # #for seedlevel2 with Barrier
+%' # pvalue_seed2_Barrier<-p_value_cal2(cca_output=cca_Barrier)
+%' # write.xlsx(pvalue_seed2_Barrier,
+%' #            file="pvalues and feature detection of Seedlevel2 with Barrier.xlsx")
+%' @
+
+
+\section{Conclusion and Future Plan}
+It has been shown that the standard sparse CCA method and the multivariate sparse CCA method are not ``sparse'' enough when sample size is 12 and the number of genes is hundreds.  In future, I am gonna work with group members to improve the CCA methodology, and our main approach may take into account the group structures, $L_0$ penalty and/or proportional data constraints.
+
+\section{August 2015, Discussion with Dr.~Ivanov}
+The number of Seedlevel2s that are involved in "Carbohydates" is \Sexpr{length(grep("Carbohydrates",x=colnames(cca_seed2)))}. The number of Seedlevel2s that are involved in "Protein Metabolism" is \Sexpr{length(grep("Protein Metabolism",x=colnames(cca_seed2)))}. And the number of Seedlevel2s that are involved in "Virulence" is \Sexpr{length(grep("Virulence -",x=colnames(cca_seed2)))}. Now if we use these category of seedlevels instead of all of them, let's see the result of sCCA.
+
+\subsection{Specific set of Seedlevel2 with Immunology}
+<<specific seedlevels Immun,results="hide">>=
+specific_seed2<-cca_seed2[,c(grep("Carbohydrates",x=colnames(cca_seed2)),
+                   grep("Protein Metabolism",x=colnames(cca_seed2)),
+                   grep("Virulence -",x=colnames(cca_seed2)))]
+
+library(PMA)
+set.seed(1221)
+specific_Immun_permute<-CCA.permute(x=specific_seed2,z=cca_microarray_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+specific_Immun_penaltyx<-specific_Immun_permute$bestpenaltyx
+specific_Immun_penaltyz<-specific_Immun_permute$bestpenaltyz
+specific_Immun<-CCA(x=specific_seed2,z=cca_microarray_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(specific_seed2),min=20),
+                 znames=colnames(cca_microarray_subjects),
+                 penaltyx=specific_Immun_penaltyx,
+                 penaltyz=specific_Immun_penaltyz,
+                 K=2,niter=100)
+colnames(cca_microarray_subjects)[which(specific_Immun$v[,1]!=0)]
+colnames(cca_microarray_subjects)[which(specific_Immun$v[,2]!=0)]
+
+###########
+## graphs:
+#######
+specific_Immun_u<-specific_seed2%*%specific_Immun$u
+specific_Immun_v<-cca_microarray_subjects%*%specific_Immun$v
+specific_Immun_scores<-cbind(specific_Immun_u,specific_Immun_v)
+colnames(specific_Immun_scores)<-c("U1","U2","V1","V2")
+specific_Immun_scores<-as.data.frame(specific_Immun_scores)
+specific_Immun_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+specific_Immun_plot2<-ggplot(specific_Immun_scores,
+                               aes(x=V1,y=V2,col=U1,shape=type))
+specific_Immun_plot2<-specific_Immun_plot2+geom_point(size=4)
+specific_Immun_plot2<-specific_Immun_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+specific_Immun_plot2<-specific_Immun_plot2+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_Immun_plot2<-specific_Immun_plot2+geom_text(aes(label=rownames(specific_Immun_scores)),col="black",hjust=1.1,size=5)
+# x scale:
+specific_Immun_plot2<-specific_Immun_plot2+scale_x_continuous("First Component Scores of Immunlogy",limits=c(min(specific_Immun_scores$V1)-0.2*diff(range(specific_Immun_scores$V1)),max(specific_Immun_scores$V1)+0.2*diff(range(specific_Immun_scores$V1))))
+# y scale:
+specific_Immun_plot2<-specific_Immun_plot2+scale_y_continuous("Second Component Scores of Immunology",limits=c(min(specific_Immun_scores$V2)-0.2*diff(range(specific_Immun_scores$V2)),max(specific_Immun_scores$V2)+0.2*diff(range(specific_Immun_scores$V2))))
+specific_Immun_plot2<-specific_Immun_plot2+labs(title="Sparse CCA Scores for Immunology as Base")
+specific_Immun_plot2<-specific_Immun_plot2+theme(legend.title = element_text(size=12),plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_Immun_plot2
+
+# the other cca graph:
+specific_Immun_plot1<-ggplot(specific_Immun_scores,
+                               aes(x=U1,y=U2,col=V1,shape=type))
+specific_Immun_plot1<-specific_Immun_plot1+geom_point(size=4,
+                                  position=position_jitter(height=2,width=2))
+specific_Immun_plot1<-specific_Immun_plot1+scale_colour_continuous(name="First Component\nScores of Immunology",low="blue",high="red")
+specific_Immun_plot1<-specific_Immun_plot1+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_Immun_plot1<-specific_Immun_plot1+geom_text(aes(label=rownames(specific_Immun_scores)),col="black",hjust=1.1,size=4
+# ,position=position_jitter(height=2,width=2)
+)
+# x scale:
+specific_Immun_plot1<-specific_Immun_plot1+scale_x_continuous("First Component Scores of Seedlevel2",limits=c(min(specific_Immun_scores$U1)-0.2*diff(range(specific_Immun_scores$U1)),max(specific_Immun_scores$U1)+0.2*diff(range(specific_Immun_scores$U1))))
+specific_Immun_plot1<-specific_Immun_plot1+scale_y_continuous("Second Component Scores of Seedlevel2",limits=c(min(specific_Immun_scores$U2)-0.2*diff(range(specific_Immun_scores$U2)),max(specific_Immun_scores$U2)+0.2*diff(range(specific_Immun_scores$U2))))
+specific_Immun_plot1<-specific_Immun_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+specific_Immun_plot1<-specific_Immun_plot1+theme(legend.title = element_text(size=12),plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_Immun_plot1<-specific_Immun_plot1+scale_fill_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_Immun_plot1
+@
+Sparse CCA results in detecting $\Sexpr{length(which(specific_Immun$v[,1]!=0))}$ genes in the first component, which is much larger than the result with all seedlevel2 data, and $\Sexpr{length(which(specific_Immun$v[,2]!=0))}$ genes in the second component.
+
+% which is {\it \Sexpr{colnames(cca_microarray_subjects)[which(specific_Immun$v[,2]!=0)]}}.
+
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from Immunology & \Sexpr{mean(specific_Immun_scores$V1[1:6])} & \Sexpr{sd(specific_Immun_scores$V1[1:6])} & \Sexpr{mean(specific_Immun_scores$V1[7:12])} & \Sexpr{sd(specific_Immun_scores$V1[7:12])}\\
+\hline
+Second Component Scores from Immun & \Sexpr{mean(specific_Immun_scores$V2[1:6])} & \Sexpr{sd(specific_Immun_scores$V2[1:6])} & \Sexpr{mean(specific_Immun_scores$V2[7:12])} & \Sexpr{sd(specific_Immun_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(specific_Immun_scores$U1[1:6])} & \Sexpr{sd(specific_Immun_scores$U1[1:6])} & \Sexpr{mean(specific_Immun_scores$U1[7:12])} & \Sexpr{sd(specific_Immun_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(specific_Immun_scores$U2[1:6])} & \Sexpr{sd(specific_Immun_scores$U2[1:6])} & \Sexpr{mean(specific_Immun_scores$U2[7:12])} & \Sexpr{sd(specific_Immun_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+\subsection{Specific set of seedlevel2 with Barrier}
+<<specific seedlevels Barrier,results="hide">>=
+## use these seedlevel2
+library(PMA)
+specific_Barrier_permute<-CCA.permute(x=specific_seed2,z=cca_Barrier_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+specific_Barrier_penaltyx<-specific_Barrier_permute$bestpenaltyx
+specific_Barrier_penaltyz<-specific_Barrier_permute$bestpenaltyz
+specific_Barrier<-CCA(x=specific_seed2,z=cca_Barrier_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(specific_seed2),min=20),
+                 znames=colnames(cca_Barrier_subjects),
+                 penaltyx=Barrier_penaltyx,penaltyz=Barrier_penaltyz,
+                 K=2,niter=100)
+colnames(cca_Barrier_subjects)[which(specific_Barrier$v[,1]!=0)]
+colnames(cca_Barrier_subjects)[which(specific_Barrier$v[,2]!=0)]
+
+###########
+## graphs:
+#######
+specific_Barrier_u<-specific_seed2%*%specific_Barrier$u
+specific_Barrier_v<-cca_Barrier_subjects%*%specific_Barrier$v
+specific_Barrier_scores<-cbind(specific_Barrier_u,specific_Barrier_v)
+colnames(specific_Barrier_scores)<-c("U1","U2","V1","V2")
+specific_Barrier_scores<-as.data.frame(specific_Barrier_scores)
+specific_Barrier_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+specific_Barrier_plot2<-ggplot(specific_Barrier_scores,
+                               aes(x=V1,y=V2,col=U1,shape=type))
+specific_Barrier_plot2<-specific_Barrier_plot2+geom_point(size=4)
+specific_Barrier_plot2<-specific_Barrier_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+specific_Barrier_plot2<-specific_Barrier_plot2+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_Barrier_plot2<-specific_Barrier_plot2+geom_text(aes(label=rownames(specific_Barrier_scores)),col="black",hjust=1.1,size=5)
+# x scale:
+specific_Barrier_plot2<-specific_Barrier_plot2+scale_x_continuous("First Component Scores of Barrier",limits=c(min(specific_Barrier_scores$V1)-0.2*diff(range(specific_Barrier_scores$V1)),max(specific_Barrier_scores$V1)+0.2*diff(range(specific_Barrier_scores$V1))))
+# y scale:
+specific_Barrier_plot2<-specific_Barrier_plot2+scale_y_continuous("Second Component Scores of Barrier",limits=c(min(specific_Barrier_scores$V2)-0.2*diff(range(specific_Barrier_scores$V2)),max(specific_Barrier_scores$V2)+0.2*diff(range(specific_Barrier_scores$V2))))
+specific_Barrier_plot2<-specific_Barrier_plot2+labs(title="Sparse CCA Scores for Barrier as Base")
+specific_Barrier_plot2<-specific_Barrier_plot2+theme(legend.title = element_text(size=12),plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_Barrier_plot2
+
+# the other cca graph:
+specific_Barrier_plot1<-ggplot(specific_Barrier_scores,
+                               aes(x=U1,y=U2,col=V1,shape=type))
+specific_Barrier_plot1<-specific_Barrier_plot1+geom_point(size=4,
+                                  position=position_jitter(height=2,width=2))
+specific_Barrier_plot1<-specific_Barrier_plot1+scale_colour_continuous(name="First Component\nScores of Barrier",low="blue",high="red")
+specific_Barrier_plot1<-specific_Barrier_plot1+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_Barrier_plot1<-specific_Barrier_plot1+geom_text(aes(label=rownames(specific_Barrier_scores)),col="black",hjust=1.1,size=4
+# ,position=position_jitter(height=2,width=2)
+)
+# x scale:
+specific_Barrier_plot1<-specific_Barrier_plot1+scale_x_continuous("First Component Scores of Seedlevel2",limits=c(min(specific_Barrier_scores$U1)-0.2*diff(range(specific_Barrier_scores$U1)),max(specific_Barrier_scores$U1)+0.2*diff(range(specific_Barrier_scores$U1))))
+specific_Barrier_plot1<-specific_Barrier_plot1+scale_y_continuous("Second Component Scores of Seedlevel2",limits=c(min(specific_Barrier_scores$U2)-0.2*diff(range(specific_Barrier_scores$U2)),max(specific_Barrier_scores$U2)+0.2*diff(range(specific_Barrier_scores$U2))))
+specific_Barrier_plot1<-specific_Barrier_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+specific_Barrier_plot1<-specific_Barrier_plot1+theme(legend.title = element_text(size=12),plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_Barrier_plot1<-specific_Barrier_plot1+scale_fill_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_Barrier_plot1
+@
+Sparse CCA results in detecting $\Sexpr{length(which(specific_Barrier$v[,1]!=0))}$ gene out of \Sexpr{dim(cca_Barrier_subjects)[2]} in the first component, which is {\it \Sexpr{colnames(cca_Barrier_subjects)[which(specific_Barrier$v[,1]!=0)]}}, and $\Sexpr{length(which(specific_Barrier$v[,2]!=0))}$ gene in the second component, which is {\it \Sexpr{colnames(cca_Barrier_subjects)[which(specific_Barrier$v[,2]!=0)]}}.
+
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from Barrier & \Sexpr{mean(specific_Barrier_scores$V1[1:6])} & \Sexpr{sd(specific_Barrier_scores$V1[1:6])} & \Sexpr{mean(specific_Barrier_scores$V1[7:12])} & \Sexpr{sd(specific_Barrier_scores$V1[7:12])}\\
+\hline
+Second Component Scores from Barrier & \Sexpr{mean(specific_Barrier_scores$V2[1:6])} & \Sexpr{sd(specific_Barrier_scores$V2[1:6])} & \Sexpr{mean(specific_Barrier_scores$V2[7:12])} & \Sexpr{sd(specific_Barrier_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(specific_Barrier_scores$U1[1:6])} & \Sexpr{sd(specific_Barrier_scores$U1[1:6])} & \Sexpr{mean(specific_Barrier_scores$U1[7:12])} & \Sexpr{sd(specific_Barrier_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(specific_Barrier_scores$U2[1:6])} & \Sexpr{sd(specific_Barrier_scores$U2[1:6])} & \Sexpr{mean(specific_Barrier_scores$U2[7:12])} & \Sexpr{sd(specific_Barrier_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+\subsection{Specific set of seedlevel2 with SMD related genes}
+<<specific seedlevels SMD,results="hide">>=
+## use these seedlevel2
+library(PMA)
+specific_SMD_permute<-CCA.permute(x=specific_seed2,z=cca_SMD_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+specific_SMD_penaltyx<-specific_SMD_permute$bestpenaltyx
+specific_SMD_penaltyz<-specific_SMD_permute$bestpenaltyz
+specific_SMD<-CCA(x=specific_seed2,z=cca_SMD_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(specific_seed2),min=20),
+                 znames=colnames(cca_SMD_subjects),
+                 penaltyx=SMD_penaltyx,penaltyz=SMD_penaltyz,
+                 K=2,niter=100)
+colnames(cca_SMD_subjects)[which(specific_SMD$v[,1]!=0)]
+colnames(cca_SMD_subjects)[which(specific_SMD$v[,2]!=0)]
+
+###########
+## graphs:
+#######
+specific_SMD_u<-specific_seed2%*%specific_SMD$u
+specific_SMD_v<-cca_SMD_subjects%*%specific_SMD$v
+specific_SMD_scores<-cbind(specific_SMD_u,specific_SMD_v)
+colnames(specific_SMD_scores)<-c("U1","U2","V1","V2")
+specific_SMD_scores<-as.data.frame(specific_SMD_scores)
+specific_SMD_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+specific_SMD_plot2<-ggplot(specific_SMD_scores,
+                               aes(x=V1,y=V2,col=U1,shape=type))
+specific_SMD_plot2<-specific_SMD_plot2+geom_point(size=4)
+specific_SMD_plot2<-specific_SMD_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+specific_SMD_plot2<-specific_SMD_plot2+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_SMD_plot2<-specific_SMD_plot2+geom_text(aes(label=rownames(specific_SMD_scores)),col="black",hjust=1.1,size=5)
+# x scale:
+specific_SMD_plot2<-specific_SMD_plot2+scale_x_continuous("First Component Scores of SMD",limits=c(min(specific_SMD_scores$V1)-0.2*diff(range(specific_SMD_scores$V1)),max(specific_SMD_scores$V1)+0.2*diff(range(specific_SMD_scores$V1))))
+# y scale:
+specific_SMD_plot2<-specific_SMD_plot2+scale_y_continuous("Second Component Scores of SMD",limits=c(min(specific_SMD_scores$V2)-0.2*diff(range(specific_SMD_scores$V2)),max(specific_SMD_scores$V2)+0.2*diff(range(specific_SMD_scores$V2))))
+specific_SMD_plot2<-specific_SMD_plot2+labs(title="Sparse CCA Scores for SMD as Base")
+specific_SMD_plot2<-specific_SMD_plot2+theme(legend.title = element_text(size=12),plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_SMD_plot2
+
+# the other cca graph:
+specific_SMD_plot1<-ggplot(specific_SMD_scores,
+                               aes(x=U1,y=U2,col=V1,shape=type))
+specific_SMD_plot1<-specific_SMD_plot1+geom_point(size=4
+                                      #,position=position_jitter(height=2,width=2)
+                                       )
+specific_SMD_plot1<-specific_SMD_plot1+scale_colour_continuous(name="First Component\nScores of SMD",low="blue",high="red")
+specific_SMD_plot1<-specific_SMD_plot1+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_SMD_plot1<-specific_SMD_plot1+geom_text(aes(label=rownames(specific_SMD_scores)),col="black",hjust=1.1,size=4
+# ,position=position_jitter(height=2,width=2)
+)
+# x scale:
+specific_SMD_plot1<-specific_SMD_plot1+scale_x_continuous("First Component Scores of Seedlevel2",limits=c(min(specific_SMD_scores$U1)-0.2*diff(range(specific_SMD_scores$U1)),max(specific_SMD_scores$U1)+0.2*diff(range(specific_SMD_scores$U1))))
+specific_SMD_plot1<-specific_SMD_plot1+scale_y_continuous("Second Component Scores of Seedlevel2",limits=c(min(specific_SMD_scores$U2)-0.2*diff(range(specific_SMD_scores$U2)),max(specific_SMD_scores$U2)+0.2*diff(range(specific_SMD_scores$U2))))
+specific_SMD_plot1<-specific_SMD_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+specific_SMD_plot1<-specific_SMD_plot1+theme(legend.title = element_text(size=12),plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_SMD_plot1<-specific_SMD_plot1+scale_fill_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_SMD_plot1
+@
+The second graph looks weird, so let's look at which seedlevel2s are detected by sparse CCA first: the first component includes {\it \Sexpr{colnames(specific_seed2)[which(specific_SMD$u[,1]!=0)]}} and the second component includes {\it \Sexpr{colnames(specific_seed2)[which(specific_SMD$u[,2]!=0)]}}. Note that the observations of {\it \Sexpr{colnames(specific_seed2)[which(specific_SMD$u[,1]!=0)]}} are lots of 0.  
+Sparse CCA results in detecting $\Sexpr{length(which(specific_SMD$v[,1]!=0))}$ gene out of \Sexpr{dim(cca_SMD_subjects)[2]} in the first component, which is {\it \Sexpr{colnames(cca_SMD_subjects)[which(specific_SMD$v[,1]!=0)]}}, and $\Sexpr{length(which(specific_SMD$v[,2]!=0))}$ gene in the second component, which is {\it \Sexpr{colnames(cca_SMD_subjects)[which(specific_SMD$v[,2]!=0)]}}.
+
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from SMD & \Sexpr{mean(specific_SMD_scores$V1[1:6])} & \Sexpr{sd(specific_SMD_scores$V1[1:6])} & \Sexpr{mean(specific_SMD_scores$V1[7:12])} & \Sexpr{sd(specific_SMD_scores$V1[7:12])}\\
+\hline
+Second Component Scores from SMD & \Sexpr{mean(specific_SMD_scores$V2[1:6])} & \Sexpr{sd(specific_SMD_scores$V2[1:6])} & \Sexpr{mean(specific_SMD_scores$V2[7:12])} & \Sexpr{sd(specific_SMD_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(specific_SMD_scores$U1[1:6])} & \Sexpr{sd(specific_SMD_scores$U1[1:6])} & \Sexpr{mean(specific_SMD_scores$U1[7:12])} & \Sexpr{sd(specific_SMD_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(specific_SMD_scores$U2[1:6])} & \Sexpr{sd(specific_SMD_scores$U2[1:6])} & \Sexpr{mean(specific_SMD_scores$U2[7:12])} & \Sexpr{sd(specific_SMD_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+\subsection{Specific set of seedlevel2 with SCFA related genes}
+<<specific seedlevels SCFA,results="hide">>=
+## use these seedlevel2
+library(PMA)
+specific_SCFA_permute<-CCA.permute(x=specific_seed2,z=cca_SCFA_subjects,
+                                 typex="standard",typez="standard",
+                                 niter=50)
+specific_SCFA_penaltyx<-specific_SCFA_permute$bestpenaltyx
+specific_SCFA_penaltyz<-specific_SCFA_permute$bestpenaltyz
+specific_SCFA<-CCA(x=specific_seed2,z=cca_SCFA_subjects,
+                 typex="standard",typez="standard",
+                 xnames=abbreviate(colnames(specific_seed2),min=20),
+                 znames=colnames(cca_SCFA_subjects),
+                 penaltyx=SCFA_penaltyx,penaltyz=SCFA_penaltyz,
+                 K=2,niter=100)
+colnames(cca_SCFA_subjects)[which(specific_SCFA$v[,1]!=0)]
+colnames(cca_SCFA_subjects)[which(specific_SCFA$v[,2]!=0)]
+
+###########
+## graphs:
+#######
+specific_SCFA_u<-specific_seed2%*%specific_SCFA$u
+specific_SCFA_v<-cca_SCFA_subjects%*%specific_SCFA$v
+specific_SCFA_scores<-cbind(specific_SCFA_u,specific_SCFA_v)
+colnames(specific_SCFA_scores)<-c("U1","U2","V1","V2")
+specific_SCFA_scores<-as.data.frame(specific_SCFA_scores)
+specific_SCFA_scores$type<-c(rep("BF",6),rep("FF",6))
+
+library(ggplot2)
+specific_SCFA_plot2<-ggplot(specific_SCFA_scores,
+                               aes(x=V1,y=V2,col=U1,shape=type))
+specific_SCFA_plot2<-specific_SCFA_plot2+geom_point(size=4)
+specific_SCFA_plot2<-specific_SCFA_plot2+scale_colour_continuous(name="First Component\nScores of Seedlevel2",low="blue",high="red")
+specific_SCFA_plot2<-specific_SCFA_plot2+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_SCFA_plot2<-specific_SCFA_plot2+geom_text(aes(label=rownames(specific_SCFA_scores)),col="black",hjust=1.1,size=5)
+# x scale:
+specific_SCFA_plot2<-specific_SCFA_plot2+scale_x_continuous("First Component Scores of SCFA",limits=c(min(specific_SCFA_scores$V1)-0.2*diff(range(specific_SCFA_scores$V1)),max(specific_SCFA_scores$V1)+0.2*diff(range(specific_SCFA_scores$V1))))
+# y scale:
+specific_SCFA_plot2<-specific_SCFA_plot2+scale_y_continuous("Second Component Scores of SCFA",limits=c(min(specific_SCFA_scores$V2)-0.2*diff(range(specific_SCFA_scores$V2)),max(specific_SCFA_scores$V2)+0.2*diff(range(specific_SCFA_scores$V2))))
+specific_SCFA_plot2<-specific_SCFA_plot2+labs(title="Sparse CCA Scores for SCFA as Base")
+specific_SCFA_plot2<-specific_SCFA_plot2+theme(legend.title = element_text(size=12),plot.title = element_text(size=16,vjust=2.0, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_SCFA_plot2
+
+# the other cca graph:
+specific_SCFA_plot1<-ggplot(specific_SCFA_scores,
+                               aes(x=U1,y=U2,col=V1,shape=type))
+specific_SCFA_plot1<-specific_SCFA_plot1+geom_point(size=4,
+                                  position=position_jitter(height=2,width=2))
+specific_SCFA_plot1<-specific_SCFA_plot1+scale_colour_continuous(name="First Component\nScores of SCFA",low="blue",high="red")
+specific_SCFA_plot1<-specific_SCFA_plot1+scale_shape_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_SCFA_plot1<-specific_SCFA_plot1+geom_text(aes(label=rownames(specific_SCFA_scores)),col="black",hjust=1.1,size=4
+# ,position=position_jitter(height=2,width=2)
+)
+# x scale:
+specific_SCFA_plot1<-specific_SCFA_plot1+scale_x_continuous("First Component Scores of Seedlevel2",limits=c(min(specific_SCFA_scores$U1)-0.2*diff(range(specific_SCFA_scores$U1)),max(specific_SCFA_scores$U1)+0.2*diff(range(specific_SCFA_scores$U1))))
+specific_SCFA_plot1<-specific_SCFA_plot1+scale_y_continuous("Second Component Scores of Seedlevel2",limits=c(min(specific_SCFA_scores$U2)-0.2*diff(range(specific_SCFA_scores$U2)),max(specific_SCFA_scores$U2)+0.2*diff(range(specific_SCFA_scores$U2))))
+specific_SCFA_plot1<-specific_SCFA_plot1+labs(title="Sparse CCA Scores for Seedlevel2 as Base")
+specific_SCFA_plot1<-specific_SCFA_plot1+theme(legend.title = element_text(size=12),plot.title = element_text(vjust=2.0,size=16, face="bold"),
+                       legend.text=element_text(size=10))
+
+specific_SCFA_plot1<-specific_SCFA_plot1+scale_fill_discrete(name="Feeding Type",labels=c("Breastfed","Formula-fed"))
+specific_SCFA_plot1
+@
+Sparse CCA results in detecting $\Sexpr{length(which(specific_SCFA$v[,1]!=0))}$ genes out of \Sexpr{dim(cca_SCFA_subjects)[2]} in the first component, which are {\it \Sexpr{colnames(cca_SCFA_subjects)[which(specific_SCFA$v[,1]!=0)]}}, and $\Sexpr{length(which(specific_SCFA$v[,2]!=0))}$ genes in the second component, which are {\it \Sexpr{colnames(cca_SCFA_subjects)[which(specific_SCFA$v[,2]!=0)]}}.
+
+\begin{tabular}{|p{6 cm}|ll|ll|}
+\hline
+& \multicolumn{2}{c}{Breastfeeding} \vline & \multicolumn{2}{c}{Formula-feeding} \vline \\
+\hline
+& mean & sd & mean & sd \\
+\hline
+First Component Scores from SCFA & \Sexpr{mean(specific_SCFA_scores$V1[1:6])} & \Sexpr{sd(specific_SCFA_scores$V1[1:6])} & \Sexpr{mean(specific_SCFA_scores$V1[7:12])} & \Sexpr{sd(specific_SCFA_scores$V1[7:12])}\\
+\hline
+Second Component Scores from SCFA & \Sexpr{mean(specific_SCFA_scores$V2[1:6])} & \Sexpr{sd(specific_SCFA_scores$V2[1:6])} & \Sexpr{mean(specific_SCFA_scores$V2[7:12])} & \Sexpr{sd(specific_SCFA_scores$V2[7:12])}\\
+\hline
+First Component Scores from Seedlevel2 & \Sexpr{mean(specific_SCFA_scores$U1[1:6])} & \Sexpr{sd(specific_SCFA_scores$U1[1:6])} & \Sexpr{mean(specific_SCFA_scores$U1[7:12])} & \Sexpr{sd(specific_SCFA_scores$U1[7:12])}\\
+\hline
+Second Component Scores from Seedlevel2 & \Sexpr{mean(specific_SCFA_scores$U2[1:6])} & \Sexpr{sd(specific_SCFA_scores$U2[1:6])} & \Sexpr{mean(specific_SCFA_scores$U2[7:12])} & \Sexpr{sd(specific_SCFA_scores$U2[7:12])}\\
+\hline
+\end{tabular}
+
+% \section{Sparse Reduced Rank Regression Methods}
+% In order to analyze the association between the host gene expression level and gut microbiota, besides the sparse CCA method, we can also apply sparse reduced rank regression~\cite{chen2012sparse} and~\cite{vounou2012sparse}. 
+<<srrr original,eval=FALSE>>=
+write.table(x=cca_seed2,file="cca_seed2.csv",sep=",")
+write.table(x=cca_microarray_subjects,file="cca_microarray_subjects.csv",sep=",")
+# Rcpp::sourceCpp("../../SRRR_code/updateB.cpp")
+# source("../../SRRR_code/srrrSolve.R")
+# test<-srrr_cvError(Y=cca_seed2,X=cca_microarray_subjects
+#                ,rank=2,all_tol=0.01,all_max=100,tolB=0.01,MaxB=100,lambda=0.01)
+# now<-proc.time()
+# test2<-srrr_cvError(Y=cca_seed2,X=cca_microarray_subjects
+#         ,rank=2,all_tol=0.01,all_max=100,tolB=0.01,MaxB=100,lambda=0.01,gamma=0.1)
+# proc.time()-now
+@
+
+% \section{Output Data Files}
+% Regenerate the detecting genes list as well as the Seedlevel2 list, and send to Dr. Ivan Ivanov and Dr. Robert Chapkin. 
+
+<<output data,eval=FALSE>>=
+## copy from the same code above
+library(xlsx)
+p_value_cal<-function(data=cca_microarray_subjects,
+                      cca_output=cca_out_both_2){
+n<-dim(data)[2]
+output<-sapply(1:n,function(x,data){
+  p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+  fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+  return(c(p_value,fold_change))
+},data=data)
+output<-as.data.frame(t(output),row.names=colnames(data))
+names(output)<-c("p_value","fold_change")
+output$adjust_p<-p.adjust(output$p_value,method="fdr")
+output$first_comp_loading<-cca_output$v[,1]
+output$second_comp_loading<-cca_output$v[,2]
+output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+output1<-output[which(output$first_comp_loading!=0),]
+output2<-output[which(output$first_comp_loading==0),]
+output2<-output2[order(abs(output2$second_comp_loading),decreasing=T),]
+output<-rbind(output1,output2)
+#return(output)
+return(output[c(4,5)])
+}
+## fold change & pvalues
+unique_valid_genes_2<-dim(samples_Loessed_redo)[2]
+pvalue_for_all<-sapply(1:unique_valid_genes_2,function(x,data){
+  p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+  log_fold_change<-log(mean(data[1:6,x])/mean(data[7:12,x]))
+  return(c(p_value,log_fold_change))
+},data=samples_Loessed_redo)
+
+pvalue_for_all<-as.data.frame(t(pvalue_for_all),
+                              row.names=colnames(samples_Loessed_redo))
+pvalue_for_all$adjust_p<-p.adjust(pvalue_for_all[,1],method="fdr")
+names(pvalue_for_all)<-c("Raw p values","Log of Fold Change",
+                         "Adjusted p values")
+##for Immunology:
+pvalue_Immun_genes<-p_value_cal()
+#colnames(pvalue_Immun_genes)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_Immun_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_Immun_genes<-cbind(pvalue_Immun_genes
+                          ,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                          rownames(pvalue_Immun_genes)),])
+
+temp_NULL<-combo_immunology_list[! combo_immunology_list 
+                                 %in% colnames(cca_microarray_subjects)]
+pvalue_Immun_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_Immun_genes_NULL)<-temp_NULL
+# colnames(pvalue_Immun_genes_NULL)<-c("Raw p value", "Fold Change",
+#                                  "Adjusted p value","First Comp. Loading of sCCA")
+colnames(pvalue_Immun_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Log of Fold Change",
+                                      "Adjusted p values")
+
+pvalue_Immun_genes<-rbind(pvalue_Immun_genes,pvalue_Immun_genes_NULL)
+
+write.xlsx(pvalue_Immun_genes,file="output data/sCCA with Seedlevel2/Immunology sparse CCA loadings with t test results.xlsx")
+
+##for Barrier
+pvalue_Barrier_genes<-p_value_cal(data=cca_Barrier_subjects,
+                                  cca_output=cca_Barrier)
+colnames(pvalue_Barrier_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_Barrier_genes<-cbind(pvalue_Barrier_genes,
+                            pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                                 rownames(pvalue_Barrier_genes)),])
+
+temp_NULL<-Barrier_list[! Barrier_list 
+                                 %in% colnames(cca_Barrier_subjects)]
+pvalue_Barrier_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_Barrier_genes_NULL)<-temp_NULL
+colnames(pvalue_Barrier_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Log of Fold Change",
+                                      "Adjusted p values")
+pvalue_Barrier_genes<-rbind(pvalue_Barrier_genes,pvalue_Barrier_genes_NULL)
+write.xlsx(pvalue_Barrier_genes,file="output data/sCCA with Seedlevel2/Barrier genes sparse CCA loadings with t test results.xlsx")
+
+##for SCFA
+pvalue_SCFA_genes<-p_value_cal(data=cca_SCFA_subjects,
+                                  cca_output=cca_SCFA)
+colnames(pvalue_SCFA_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_SCFA_genes<-cbind(pvalue_SCFA_genes
+                         ,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                         rownames(pvalue_SCFA_genes)),])
+
+temp_NULL<-SCFA_list[! SCFA_list 
+                                 %in% colnames(cca_SCFA_subjects)]
+pvalue_SCFA_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_SCFA_genes_NULL)<-temp_NULL
+colnames(pvalue_SCFA_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Log of Fold Change",
+                                      "Adjusted p values")
+pvalue_SCFA_genes<-rbind(pvalue_SCFA_genes,pvalue_SCFA_genes_NULL)
+write.xlsx(pvalue_SCFA_genes,file="output data/sCCA with Seedlevel2/SCFA related genes sparse CCA loadings with t test results.xlsx")
+
+
+##for SMD
+pvalue_SMD_genes<-p_value_cal(data=cca_SMD_subjects,
+                                  cca_output=cca_SMD)
+colnames(pvalue_SMD_genes)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA")
+pvalue_SMD_genes<-cbind(pvalue_SMD_genes,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                                                  rownames(pvalue_SMD_genes)),])
+
+temp_NULL<-SMD_list[! SMD_list 
+                                 %in% colnames(cca_SMD_subjects)]
+pvalue_SMD_genes_NULL<-data.frame(rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)),
+                                    rep(NA,length(temp_NULL)),
+                                     rep(NA,length(temp_NULL)))
+rownames(pvalue_SMD_genes_NULL)<-temp_NULL
+colnames(pvalue_SMD_genes_NULL)<-c("First Comp. Loading of sCCA",
+                                     "Second Comp. Loading of sCCA",
+                                     "Raw p values","Log of Fold Change",
+                                      "Adjusted p values")
+pvalue_SMD_genes<-rbind(pvalue_SMD_genes,pvalue_SMD_genes_NULL)
+write.xlsx(pvalue_SMD_genes,file="output data/sCCA with Seedlevel2/SMD genes sparse CCA loadings with t test results.xlsx")
+
+
+## for seedlevel2:
+## for seedlevel2:
+## for seedlevel2:
+## for seedlevel2:
+p_value_cal2<-function(data=cca_seed2,
+                      cca_output=cca_out_both_2){
+n<-dim(data)[2]
+output<-sapply(1:n,function(x,data){
+  p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+  log_fold_change<-log(mean(data[1:6,x])/mean(data[7:12,x]))
+  return(c(p_value,log_fold_change))
+},data=data)
+output<-as.data.frame(t(output),row.names=colnames(data))
+names(output)<-c("p_value","Log of Fold Change")
+output$adjust_p<-p.adjust(output$p_value,method="fdr")
+output$first_comp_loading<-cca_output$u[,1]
+output$second_comp_loading<-cca_output$u[,2]
+output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+output1<-output[which(output$first_comp_loading!=0),]
+output2<-output[which(output$first_comp_loading==0),]
+output2<-output2[order(abs(output2$second_comp_loading),decreasing=T),]
+output<-rbind(output1,output2)
+return(output)
+}
+
+# for seedlevel2 with Immunology
+pvalue_seed2_Immun<-p_value_cal2()
+write.xlsx(pvalue_seed2_Immun,
+           file="output data/sCCA with Seedlevel2/pvalues and feature detection of Seedlevel2 with Immunology.xlsx")
+
+# #for seedlevel2 with Barrier
+pvalue_seed2_Barrier<-p_value_cal2(cca_output=cca_Barrier)
+write.xlsx(pvalue_seed2_Barrier,
+           file="output data/sCCA with Seedlevel2/pvalues and feature detection of Seedlevel2 with Barrier.xlsx")
+
+## for seedlevel2 with SMD
+pvalue_seed2_SMD<-p_value_cal2(cca_output=cca_SMD)
+write.xlsx(pvalue_seed2_SMD,
+           file="output data/sCCA with Seedlevel2/pvalues and feature detection of Seedlevel2 with SMD.xlsx")
+
+## for seedlevel2 with SCFA
+pvalue_seed2_SCFA<-p_value_cal2(cca_output=cca_SCFA)
+write.xlsx(pvalue_seed2_SCFA,
+           file="output data/sCCA with Seedlevel2/pvalues and feature detection of Seedlevel2 with SCFA.xlsx")
+
+
+### For PCA
+### For PCA
+library(PMA)
+spca_Immun_cv<-SPC.cv(x=cca_microarray_subjects,
+                      sumabsvs=seq(1,sqrt(dim(cca_microarray_subjects)[2]),by=0.1),
+                      nfolds=10,niter=10)
+spca_Immun<-SPC(x=cca_microarray_subjects,sumabsv=spca_Immun_cv$bestsumabsv,
+                K=2)
+outputPcaLoad<-function(input=spca_Immun,dataName=cca_microarray_subjects){
+  output<-as.data.frame(input$v)
+  rownames(output)<-colnames(dataName)
+  colnames(output)<-c("First Compon. Loading","Second Compon. Loading")
+  output<-cbind(output,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                         rownames(output)),2])
+  colnames(output)[3]<-"Log of Fold Change"
+  output<-output[order(abs(output$"First Compon. Loading"),decreasing=T),]
+  output1<-output[which(output$"First Compon. Loading"!=0),]
+  output2<-output[which(output$"First Compon. Loading"==0),]
+  output2<-output2[order(abs(output2$"Second Compon. Loading"),decreasing=T),]
+  output<-rbind(output1,output2)
+}
+
+spca_Immun_load<-outputPcaLoad()
+write.csv(x=spca_Immun_load
+          ,file="output data/spca/Sparse PCA loading for Immunology.csv",
+         #   sep=",",
+         #   col.names=T,row.names=T
+         )
+
+spca_Barrier_load<-outputPcaLoad(input=spca_Barrier,dataName=cca_Barrier_subjects)
+write.csv(spca_Barrier_load,file="output data/spca/Sparse PCA loading for Barrier.csv")
+
+spca_SMD_load<-outputPcaLoad(input=spca_SMD,dataName=cca_SMD_subjects)
+write.csv(spca_SMD_load
+          ,file="output data/spca/Sparse PCA loading for SMD.csv")
+
+spca_SCFA_load<-outputPcaLoad(input=spca_SCFA,dataName=cca_SCFA_subjects)
+write.csv(spca_SCFA_load
+          ,file="output data/spca/Sparse PCA loading for SCFA.csv")
+
+spca_seed2_cv<-SPC.cv(x=cca_seed2,
+                      sumabsvs=seq(1,sqrt(dim(cca_seed2)[2]),by=0.1),
+                      nfolds=10,niter=10)
+spca_seed2<-SPC(x=cca_seed2,sumabsv=spca_seed2_cv$bestsumabsv,
+                K=2)
+pca_loading_for_seed<-function(data=cca_seed2,
+                              pca_output=spca_seed2){
+  n<-dim(data)[2]
+  output<-sapply(1:n,function(x,data){
+    p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+    log_fold_change<-log(mean(data[1:6,x])/mean(data[7:12,x]))
+    return(c(p_value,log_fold_change))
+  },data=data)
+  output<-as.data.frame(t(output),row.names=colnames(data))
+  names(output)<-c("p_value","Log of Fold Change")
+  output$adjust_p<-p.adjust(output$p_value,method="fdr")
+  output$first_comp_loading<-pca_output$v[,1]
+  output$second_comp_loading<-pca_output$v[,2]
+  output<-output[order(abs(output$first_comp_loading),decreasing=T),]
+  output1<-output[which(output$first_comp_loading!=0),]
+  output2<-output[which(output$first_comp_loading==0),]
+  output2<-output2[order(abs(output2$second_comp_loading),decreasing=T),]
+  output<-rbind(output1,output2)
+  return(output)
+}
+spca_seed2_load<-pca_loading_for_seed()
+write.csv(spca_seed2_load,
+          file="output data/spca/Sparse PCA loading for Seedlevel2.csv")
+
+################################
+## For Genes with Metabolite ###
+################################
+library(xlsx)
+outputCCAload2<-function(input=cca2_Immun,dataName=cca_microarray_subjects){
+  output<-as.data.frame(input$v)
+  rownames(output)<-colnames(dataName)
+  colnames(output)<-c("First Compon. Loading","Second Compon. Loading")
+  output<-cbind(output,pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                         rownames(output)),2])
+  colnames(output)[3]<-"Log of Fold Change"
+  output<-output[order(abs(output$"First Compon. Loading"),decreasing=T),]
+  output1<-output[which(output$"First Compon. Loading"!=0),]
+  output2<-output[which(output$"First Compon. Loading"==0),]
+  output2<-output2[order(abs(output2$"Second Compon. Loading"),decreasing=T),]
+  output<-rbind(output1,output2)
+}
+scca2_Immun_load<-outputCCAload2()
+write.xlsx(scca2_Immun_load
+           ,file="output data/sCCA with Metabolite/sCCA with Metabolite for Immunology loadings.xlsx")
+
+scca2_Barrier_load<-outputCCAload2(input=cca2_Barrier,dataName=cca_Barrier_subjects)
+write.xlsx(scca2_Barrier_load
+           ,file="output data/sCCA with Metabolite/sCCA with Metabolite for Barrier loadings.xlsx")
+
+cca2_SMD_permute<-CCA.permute(x=Metabolite,z=cca_SMD_subjects,typex="standard"
+                                 ,typez="standard",niter=50)
+cca2_SMD<-CCA(x=Metabolite,z=cca_SMD_subjects,typex="standard"
+              ,typez="standard",niter=50
+              ,penaltyx=cca2_SMD_permute$bestpenaltyx
+              ,penaltyz=cca2_SMD_permute$bestpenaltyz
+              ,K=2)
+scca2_SMD_load<-outputCCAload2(input=cca2_SMD,dataName=cca_SMD_subjects)
+write.xlsx(scca2_SMD_load
+           ,file="output data/sCCA with Metabolite/sCCA with Metabolite for SMD loadings.xlsx")
+
+scca2_SCFA_load<-outputCCAload2(input=cca2_SCFA,dataName=cca_SCFA_subjects)
+write.xlsx(scca2_SCFA_load
+           ,file="output data/sCCA with Metabolite/sCCA with Metabolite for SCFA loadings.xlsx")
+
+p_value_cal2<-function(data=Metabolite,
+                      cca_output=cca2_SCFA){
+  n<-dim(data)[2]
+  output<-sapply(1:n,function(x,data){
+    p_value<-t.test(data[1:6,x],data[7:12,x])$p.value
+    fold_change<-mean(data[1:6,x])/mean(data[7:12,x])
+    return(c(p_value,fold_change))
+  },data=data)
+  output<-as.data.frame(t(output),row.names=colnames(data))
+  names(output)<-c("p_value","Fold Change of BF/FF")
+  output$adjust_p<-p.adjust(output$p_value,method="fdr")
+  output$"First Component Loadings"<-cca_output$u[,1]
+  output$"Second Component Loadings"<-cca_output$u[,2]
+  output<-output[order(abs(output$"First Component Loadings"),decreasing=T),]
+  output1<-output[which(output$"First Component Loadings"!=0),]
+  output2<-output[which(output$"First Component Loadings"==0),]
+  output2<-output2[order(abs(output2$"Second Component Loadings"),decreasing=T),]
+  output<-rbind(output1,output2)
+  return(output[,c(2,4,5)])
+}
+scca2_metabolite_SCFA<-p_value_cal2()
+write.xlsx(scca2_metabolite_SCFA
+           ,file="output data/sCCA with Metabolite/Sparse CCA loadings of Metabolite for SCFA related genes with Metabolite.xlsx")
+
+############################
+## For 3-way Sparse CCA  ###
+############################
+outputCCAload3<-function(input=multi_Three,dataName=cca_microarray_subjects){
+  output<-as.data.frame(input$ws[[2]])
+#   rownames(output)<-colnames(dataName)
+#   colnames(output)<-"Component Loadings"
+  ## only one column, after ordering, it becomes a vector
+ 
+  ordernames<-colnames(dataName)[order(abs(output[,1]),decreasing=T)]
+  output<-output[order(abs(output[,1]),decreasing=T),]
+  output<-as.data.frame(output)
+  colnames(output)<-"Component Loadings"
+  rownames(output)<-ordernames
+    ##Dec 05, 2015 add one more column 
+  output<-cbind(output, pvalue_for_all[which(rownames(pvalue_for_all) %in%
+                                         rownames(output)),2])
+  colnames(output)[2]<-"Log of Fold Change"
+  return(output)
+}
+multi_Immun_load<-outputCCAload3()
+write.xlsx(multi_Immun_load
+           ,file="output data/Three-way sCCA/Three-way sCCA Immunology loadings.xlsx")
+
+
+multi_Barrier_load<-outputCCAload3(input=multi_Barrier
+                                   ,dataName=cca_Barrier_subjects)
+write.xlsx(multi_Barrier_load
+           ,file="output data/Three-way sCCA/Three_way sCCA Barrier loadings.xlsx")
+
+
+
+multi_SMD_permute<-MultiCCA.permute(xlist=list(cca_seed2,cca_SMD_subjects,Metabolite),
+                                    type=rep("standard",3),niter=50,trace=F)
+multi_SMD<-MultiCCA(xlist=list(cca_seed2,cca_SMD_subjects,Metabolite),
+                     penalty=multi_SMD_permute$bestpenalties,
+                     type=rep("standard",3),niter=50,trace=F)
+multi_SMD_load<-outputCCAload3(input=multi_SMD
+                               ,dataName=cca_SMD_subjects)
+write.xlsx(multi_SMD_load
+           ,file="output data/Three-way sCCA/Three_way sCCA SMD loadings.xlsx")
+
+
+multi_SCFA_load<-outputCCAload3(input=multi_SCFA
+                                ,dataName=cca_SCFA_subjects)
+write.xlsx(x=multi_SCFA_load
+           ,file="output data/Three-way sCCA/Three_way sCCA SCFA loadings.xlsx")
+########################################
+## For Specific subset of Seedlevel2 ###
+########################################
+scca4_Immun_load<-outputCCAload2(input=specific_Immun
+                                 ,dataName=cca_microarray_subjects)
+write.xlsx(scca4_Immun_load
+           ,file="output data/specific subset of seedlevel2/Immunology genes with specific seedlevel2 scca loadings.xlsx")
+
+
+scca4_Barrier_load<-outputCCAload2(input=specific_Barrier
+                                   ,dataName=cca_Barrier_subjects)
+write.xlsx(x=scca4_Barrier_load
+           ,file="output data/specific subset of seedlevel2/Barrier genes with specific seedlevel2 scca loadings.xlsx")
+
+
+scca4_SMD_load<-outputCCAload2(input=specific_SMD
+                               ,dataName=cca_SMD_subjects)
+write.xlsx(x=scca4_SMD_load
+           ,file="output data/specific subset of seedlevel2/SMD genes with specific seedlevel2 scca loadings.xlsx")
+
+
+scca4_SCFA_load<-outputCCAload2(input=specific_SCFA
+                                ,dataName=cca_SCFA_subjects)
+write.xlsx(x=scca4_SCFA_load
+           ,file="output data/specific subset of seedlevel2/SCFA genes with specific seedlevel2 scca loading.xlsx")
+
+
+## For seedlevel2:
+# outputCCA_seed_load<-function(input=specific_Immun,dataName=specific_seed2){
+#   output<-as.data.frame(input$u)
+#   rownames(output)<-colnames(dataName)
+#   colnames(output)<-c("First Compon. Loading","Second Compon. Loading")
+#   output<-output[order(abs(output$"First Compon. Loading"),decreasing=T),]
+#   output1<-output[which(output$"First Compon. Loading"!=0),]
+#   output2<-output[which(output$"First Compon. Loading"==0),]
+#   output2<-output2[order(abs(output2$"Second Compon. Loading"),decreasing=T),]
+#   output<-rbind(output1,output2)
+# }
+# specific_seed_Immun_load<-outputCCA_seed_load()
+specific_seed_Immun_load<-p_value_cal2(data=specific_seed2,
+                                       cca_output=specific_Immun)
+write.xlsx(x=specific_seed_Immun_load
+           ,file="output data/specific subset of seedlevel2/Specific Seedlevel2 sCCA with Immunonogy Seedlevel2 loading.xlsx")
+
+
+specific_seed_Barrier_load<-p_value_cal2(data=specific_seed2,
+                                                cca_output=specific_Barrier)
+write.xlsx(x=specific_seed_Barrier_load
+           ,file="output data/specific subset of seedlevel2/Specific Seedlevel2 sCCA with Barrier Seedlevel2 loading.xlsx")
+
+
+specific_seed_SMD_load<-p_value_cal2(data=specific_seed2,
+                                                cca_output=specific_SMD)
+write.xlsx(x=specific_seed_SMD_load
+           ,file="output data/specific subset of seedlevel2/Specific Seedlevel2 sCCA with SMD Seedlevel2 loading.xlsx")
+
+
+specific_seed_SCFA_load<-p_value_cal2(data=specific_seed2,
+                                                cca_output=specific_SCFA)
+write.xlsx(x=specific_seed_SCFA_load
+           ,file="output data/specific subset of seedlevel2/Specific Seedlevel2 sCCA with SCFA Seedlevel2 loading.xlsx")
+@
+\printbibliography
+\end{document}
